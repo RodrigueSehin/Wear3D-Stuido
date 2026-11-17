@@ -1,0 +1,21 @@
+{
+  "name": "@wear3d/ai-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Adaptateurs fournisseurs IA, prompts, modération",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rimraf .turbo coverage"
+  },
+  "dependencies": {
+    "@wear3d/design-schema": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {}
+}

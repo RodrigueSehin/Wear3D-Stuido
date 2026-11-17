@@ -1,0 +1,30 @@
+{
+  "name": "@wear3d/garment-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Scène R3F, chargement GLB, zones, matériaux",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rimraf .turbo coverage"
+  },
+  "dependencies": {
+    "@wear3d/design-schema": "workspace:*",
+    "@react-three/drei": "^10.6.0",
+    "@react-three/fiber": "^9.3.0",
+    "three": "^0.179.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "react": "^19.1.0",
+    "@types/three": "^0.179.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

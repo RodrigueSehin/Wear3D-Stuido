@@ -1,0 +1,24 @@
+# Configuration Supabase CLI.
+# Le projet est hébergé en ligne : lier avec `pnpm supabase link --project-ref <ref>`,
+# puis pousser les migrations avec `pnpm supabase db push`.
+project_id = "wear3d-studio"
+
+[api]
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+major_version = 17
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**"]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+[storage]
+file_size_limit = "20MiB"

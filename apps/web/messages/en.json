@@ -1,0 +1,52 @@
+{
+  "nav": {
+    "home": "Home",
+    "product": "Product",
+    "solutions": "Solutions",
+    "pricing": "Pricing",
+    "resources": "Resources",
+    "signIn": "Sign in",
+    "tryFree": "Try for free"
+  },
+  "home": {
+    "badge": "Textile design SaaS platform",
+    "titleStart": "The platform to design",
+    "titleHighlight": "3D garments",
+    "subtitle": "Design, customize and preview your garments in real time. T-shirts, jerseys, polos, hoodies, sportswear, uniforms and more.",
+    "demo": "Watch the demo (2 min)",
+    "catalogTitle": "A wide garment catalog",
+    "catalogSubtitle": "Professional models ready to customize for all your projects.",
+    "ctaTitle": "Ready to bring your ideas to life?",
+    "ctaSubtitle": "Join thousands of creators, clubs and companies already designing their garments in 3D.",
+    "ctaButton": "Get started for free"
+  },
+  "families": {
+    "tshirts": "T-shirts",
+    "football": "Football jerseys",
+    "polos": "Polos",
+    "hoodies": "Hoodies",
+    "sport": "Sportswear",
+    "basketball": "Basketball jerseys",
+    "uniforms": "Work uniforms",
+    "shorts": "Shorts & pants",
+    "jackets": "Jackets"
+  },
+  "app": {
+    "dashboard": "Dashboard",
+    "creations": "My designs",
+    "studio": "3D Studio",
+    "ai": "AI generator",
+    "catalog": "Catalog",
+    "library": "Library",
+    "shared": "Shared projects",
+    "exports": "Exports",
+    "subscription": "Subscription",
+    "settings": "Settings",
+    "upgradeTitle": "Upgrade to Business",
+    "upgradeText": "More designs, more AI, teamwork and advanced export.",
+    "upgradeButton": "See plans"
+  },
+  "placeholder": {
+    "comingIn": "Screen planned for {phase}."
+  }
+}

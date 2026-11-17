@@ -1,0 +1,21 @@
+{
+  "name": "@wear3d/editor-2d",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Canvas par zone, calques, commandes undo/redo",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rimraf .turbo coverage"
+  },
+  "dependencies": {
+    "@wear3d/design-schema": "workspace:*",
+    "konva": "^9.3.20"
+  },
+  "devDependencies": {}
+}

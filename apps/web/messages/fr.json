@@ -1,0 +1,52 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "product": "Produit",
+    "solutions": "Solutions",
+    "pricing": "Tarifs",
+    "resources": "Ressources",
+    "signIn": "Se connecter",
+    "tryFree": "Essayer gratuitement"
+  },
+  "home": {
+    "badge": "Plateforme SaaS de design textile",
+    "titleStart": "La plateforme de création de",
+    "titleHighlight": "vêtements en 3D",
+    "subtitle": "Concevez, personnalisez et visualisez vos vêtements en temps réel. T-shirts, maillots, polos, hoodies, tenues de sport, uniformes et plus encore.",
+    "demo": "Voir la démo (2 min)",
+    "catalogTitle": "Un large catalogue de vêtements",
+    "catalogSubtitle": "Des modèles professionnels prêts à personnaliser pour tous vos projets.",
+    "ctaTitle": "Prêt à donner vie à vos idées ?",
+    "ctaSubtitle": "Rejoignez des milliers de créateurs, clubs et entreprises qui conçoivent déjà leurs vêtements en 3D.",
+    "ctaButton": "Commencer gratuitement"
+  },
+  "families": {
+    "tshirts": "T-shirts",
+    "football": "Maillots de football",
+    "polos": "Polos",
+    "hoodies": "Hoodies",
+    "sport": "Tenues de sport",
+    "basketball": "Maillots de basketball",
+    "uniforms": "Uniformes pro",
+    "shorts": "Shorts & pantalons",
+    "jackets": "Vestes"
+  },
+  "app": {
+    "dashboard": "Tableau de bord",
+    "creations": "Mes créations",
+    "studio": "Studio 3D",
+    "ai": "Générateur IA",
+    "catalog": "Catalogue",
+    "library": "Bibliothèque",
+    "shared": "Projets partagés",
+    "exports": "Exports",
+    "subscription": "Abonnement",
+    "settings": "Paramètres",
+    "upgradeTitle": "Passer à Business",
+    "upgradeText": "Plus de créations, plus d'IA, travail en équipe et export avancé.",
+    "upgradeButton": "Voir les offres"
+  },
+  "placeholder": {
+    "comingIn": "Écran prévu en {phase}."
+  }
+}
