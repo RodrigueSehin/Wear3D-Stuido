@@ -2,18 +2,23 @@
  * Migrations du format de document (CDC §5.4) : toute évolution incrémente
  * `schemaVersion` et ajoute une fonction `n -> n+1` ici.
  */
-import { designDocumentV1Schema, type DesignDocumentV1 } from "./v1";
+import { designDocumentV1Schema } from "./v1";
+import { designDocumentV2Schema, type DesignDocumentV2 } from "./v2";
 
-export const CURRENT_SCHEMA_VERSION = 1 as const;
+export const CURRENT_SCHEMA_VERSION = 2 as const;
 
 /** Document courant (alias de la dernière version). */
-export type DesignDocument = DesignDocumentV1;
-export const designDocumentSchema = designDocumentV1Schema;
+export type DesignDocument = DesignDocumentV2;
+export const designDocumentSchema = designDocumentV2Schema;
 
 type Migration = (doc: Record<string, unknown>) => Record<string, unknown>;
 
 /** migrations[n] transforme un document de version n en version n+1. */
-const migrations: Record<number, Migration> = {};
+const migrations: Record<number, Migration> = {
+  // v1 → v2 : nouveaux champs (h, flips, blendMode, effects, couleur de motif) tous
+  // optionnels ou par défaut. On valide la v1 d'abord pour ne pas masquer une erreur.
+  1: (doc) => ({ ...designDocumentV1Schema.parse(doc), schemaVersion: 2 }),
+};
 
 export class DesignMigrationError extends Error {
   override name = "DesignMigrationError";

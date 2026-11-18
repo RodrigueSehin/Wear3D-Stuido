@@ -67,6 +67,55 @@ describe("composeAtlas", () => {
     expect(texts).toEqual(["KONE", "9"]);
   });
 
+  it("dessine l'ombre portée et la lueur en passes supplémentaires", () => {
+    const doc = baseDoc();
+    const text = createTextLayer("BODY_FRONT", "FX");
+    text.effects.shadow.enabled = true;
+    text.effects.glow.enabled = true;
+    doc.layers.push(text);
+    const { ctx, calls } = recordingContext();
+    composeAtlas(ctx, doc, opts);
+    expect(calls.filter((c) => c.op === "fillText")).toHaveLength(3);
+  });
+
+  it("applique les symétries et la hauteur libre par mise à l'échelle", () => {
+    const doc = baseDoc();
+    const text = createTextLayer("BODY_FRONT", "A");
+    text.transform.flipX = true;
+    text.transform.h = text.text.size * 1.15 * 2; // deux fois la hauteur naturelle
+    doc.layers.push(text);
+    const { ctx, calls } = recordingContext();
+    composeAtlas(ctx, doc, opts);
+    const scale = calls.find((c) => c.op === "scale");
+    expect(scale?.args[0]).toBe(-1);
+    expect(scale?.args[1]).toBeCloseTo(2);
+  });
+
+  it("dessine le motif d'une zone avec la couleur demandée", () => {
+    const doc = baseDoc();
+    doc.zones.BODY_FRONT!.pattern = {
+      assetId: "pattern:band-diagonal",
+      mode: "placed",
+      color: "#FF0000",
+      scale: 1,
+      rotation: 0,
+      offsetX: 0,
+      offsetY: 0,
+      opacity: 0.5,
+    };
+    const requested: string[] = [];
+    const { ctx, calls } = recordingContext();
+    composeAtlas(ctx, doc, {
+      ...opts,
+      resolvePattern: (id, color) => {
+        requested.push(`${id}|${color}`);
+        return { image: {} as CanvasImageSource, width: 100, height: 100 };
+      },
+    });
+    expect(requested).toEqual(["pattern:band-diagonal|#FF0000"]);
+    expect(calls.some((c) => c.op === "drawImage")).toBe(true);
+  });
+
   it("applique la taille de police relative à la hauteur de zone", () => {
     const doc = baseDoc();
     const text = createTextLayer("BODY_FRONT", "A");

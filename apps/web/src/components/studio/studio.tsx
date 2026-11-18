@@ -2,27 +2,21 @@
 
 import { createEmptyDocument } from "@wear3d/design-schema";
 import { getGarmentByReference, getGarmentByVersion, TSHIRT_CLASSIC } from "@wear3d/garment-engine";
-import type { GarmentViewerHandle } from "@wear3d/garment-engine/react";
-import { Loader2 } from "lucide-react";
-import dynamic from "next/dynamic";
+import { cn } from "@wear3d/ui";
+import { ChevronsLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { STUDIO_FONTS } from "@/lib/studio/fonts";
 import { loadDesign, saveDesign } from "@/lib/studio/persistence";
-import { useStudio } from "@/lib/studio/store";
+import { selectedLayerId, useStudio } from "@/lib/studio/store";
+import { AtlasComposer } from "./atlas-composer";
+import { BottomBar } from "./bottom-bar";
 import { Inspector } from "./inspector";
-import { ToolPanel } from "./tool-panel";
-import { ToolRail } from "./tool-rail";
+import { LayersPanel } from "./layers-panel";
+import { LeftPanel } from "./left-panel";
+import { LeftRail } from "./left-rail";
+import { Stage } from "./stage";
 import { TopBar } from "./top-bar";
-
-const Viewport = dynamic(() => import("./viewport").then((m) => m.Viewport), {
-  ssr: false,
-  loading: () => (
-    <div className="bg-viewport flex flex-1 items-center justify-center">
-      <div className="bg-brand-navy-900/10 h-64 w-48 animate-pulse rounded-[40%_40%_12%_12%]" />
-    </div>
-  ),
-});
 
 /** Délai d'autosave : bien en dessous des 5 s exigées (CDC F-16, REC-08). */
 const AUTOSAVE_DELAY_MS = 800;
@@ -35,10 +29,13 @@ export function Studio({
   modelReference?: string;
 }) {
   const router = useRouter();
-  const viewerRef = useRef<GarmentViewerHandle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const loadedId = useStudio((s) => s.designId);
-  const ready = loadedId === designId && useStudio.getState().doc !== null;
+  const hasDoc = useStudio((s) => s.doc !== null);
+  const libraryOpen = useStudio((s) => s.libraryOpen);
+  const inspectorOpen = useStudio((s) => s.inspectorOpen);
+  const preview = useStudio((s) => s.preview);
+  const ready = loadedId === designId && hasDoc;
 
   // Chargement ou création du brouillon local.
   useEffect(() => {
@@ -67,7 +64,7 @@ export function Studio({
           definition.versionId,
           definition.zones.map((z) => ({ code: z.code, ...z.defaults })),
         );
-        useStudio.getState().init({ designId, name: definition.name, definition, doc });
+        useStudio.getState().init({ designId, name: "Mon design", definition, doc });
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Chargement impossible");
       }
@@ -97,7 +94,7 @@ export function Studio({
     };
     const unsubscribe = useStudio.subscribe((state, prev) => {
       if (state.revision === prev.revision || state.revision === 0) return;
-      state.setSaveState("saving");
+      if (state.saveState !== "saving") state.setSaveState("saving");
       clearTimeout(timer);
       timer = setTimeout(() => void flush(), AUTOSAVE_DELAY_MS);
     });
@@ -122,8 +119,9 @@ export function Studio({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      if (target?.closest("input, textarea, select, [contenteditable=true], [role=slider]")) return;
       const s = useStudio.getState();
+      const id = selectedLayerId();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
       if (mod && key === "z" && !e.shiftKey) {
@@ -132,26 +130,27 @@ export function Studio({
       } else if (mod && (key === "y" || (key === "z" && e.shiftKey))) {
         e.preventDefault();
         s.redo();
-      } else if (mod && key === "d" && s.selectedLayerId) {
+      } else if (mod && key === "d" && id) {
         e.preventDefault();
-        s.duplicateLayer(s.selectedLayerId);
-      } else if ((e.key === "Delete" || e.key === "Backspace") && s.selectedLayerId) {
+        s.duplicateLayer(id);
+      } else if ((e.key === "Delete" || e.key === "Backspace") && id) {
         e.preventDefault();
-        s.removeLayer(s.selectedLayerId);
+        s.removeLayer(id);
       } else if (e.key === "Escape") {
-        s.selectLayer(null);
-      } else if (e.key.startsWith("Arrow") && s.selectedLayerId) {
+        if (s.preview) s.setPreview(false);
+        else s.select(null);
+      } else if (e.key.startsWith("Arrow") && id) {
         e.preventDefault();
         const step = e.shiftKey ? 0.02 : 0.005;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
         s.updateLayer(
-          s.selectedLayerId,
+          id,
           (l) => ({
             ...l,
             transform: { ...l.transform, x: l.transform.x + dx, y: l.transform.y + dy },
           }),
-          `nudge:${s.selectedLayerId}`,
+          `nudge:${id}`,
         );
       }
     };
@@ -177,7 +176,7 @@ export function Studio({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-[#0a1638]">
       {/* Force le chargement des polices du studio pour la composition Canvas. */}
       <div aria-hidden className="pointer-events-none fixed -left-[9999px] opacity-0">
         {Object.values(STUDIO_FONTS).map((f) => (
@@ -186,18 +185,58 @@ export function Studio({
           </span>
         ))}
       </div>
+
       {ready ? (
         <>
-          <TopBar viewerRef={viewerRef} />
-          <div className="relative flex min-h-0 flex-1">
-            <ToolRail />
-            <ToolPanel />
-            <Viewport viewerRef={viewerRef} />
-            <Inspector />
+          <AtlasComposer />
+          <TopBar />
+          <div className="flex min-h-0 flex-1">
+            {!preview && <LeftRail />}
+            <main
+              className={cn(
+                "flex min-w-0 flex-1 gap-3 p-3",
+                "bg-[radial-gradient(ellipse_at_45%_40%,#ffffff_0%,#eef3fb_45%,#dfe7f5_100%)]",
+                !preview && "rounded-tl-2xl",
+              )}
+            >
+              <div className="flex min-w-0 flex-1 flex-col gap-3">
+                <div className="flex min-h-0 flex-1 gap-3">
+                  {libraryOpen && !preview && <LeftPanel />}
+                  <Stage />
+                  {!preview && (
+                    <div className="hidden 2xl:flex">
+                      <LayersPanel />
+                    </div>
+                  )}
+                </div>
+                {!preview && <BottomBar />}
+              </div>
+              {!preview &&
+                (inspectorOpen ? (
+                  <div className="flex w-[300px] shrink-0 flex-col gap-3">
+                    <div className="flex max-h-[42%] min-h-0 2xl:hidden [&>section]:w-full">
+                      <LayersPanel />
+                    </div>
+                    <div className="flex min-h-0 flex-1 [&>section]:w-full">
+                      <Inspector />
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => useStudio.getState().setInspectorOpen(true)}
+                    className="flex w-10 shrink-0 flex-col items-center gap-3 rounded-2xl border border-white/70 bg-white/85 py-4 text-sm font-semibold text-[#0b1530] shadow-sm"
+                    aria-label="Ouvrir l'inspecteur"
+                  >
+                    <ChevronsLeft className="size-5" aria-hidden />
+                    <span className="[writing-mode:vertical-rl]">Inspecteur</span>
+                  </button>
+                ))}
+            </main>
           </div>
         </>
       ) : (
-        <div className="bg-viewport flex h-full items-center justify-center gap-2">
+        <div className="flex h-full items-center justify-center gap-2 bg-[#eef3fb]">
           <Loader2 className="text-action size-5 animate-spin" aria-hidden />
           <span className="text-muted-foreground text-sm">Ouverture du studio…</span>
         </div>

@@ -78,6 +78,24 @@ describe("parseDesignDocument", () => {
     expect(doc.zones.SLEEVE_LEFT?.pattern?.mode).toBe("repeat");
   });
 
+  it("migre un document v1 en v2 avec les valeurs par défaut", () => {
+    const doc = parseDesignDocument(cdcExample);
+    expect(cdcExample.schemaVersion).toBe(1);
+    expect(doc.schemaVersion).toBe(2);
+    const image = doc.layers[2]!;
+    expect(image.blendMode).toBe("normal");
+    expect(image.effects.shadow.enabled).toBe(false);
+    expect(image.transform.flipX).toBe(false);
+    expect(image.transform.h).toBeUndefined();
+    expect(doc.zones.SLEEVE_LEFT?.pattern?.color).toBe("#FFFFFF");
+  });
+
+  it("refuse une migration depuis une v1 invalide", () => {
+    const bad = structuredClone(cdcExample) as Record<string, unknown>;
+    delete bad.zones;
+    expect(safeParseDesignDocument(bad).success).toBe(false);
+  });
+
   it("refuse une version future", () => {
     const r = safeParseDesignDocument({ ...cdcExample, schemaVersion: 99 });
     expect(r.success).toBe(false);

@@ -1,7 +1,7 @@
-import { createEmptyDocument, createTextLayer } from "@wear3d/design-schema";
+import { createEmptyDocument, createImageLayer, createTextLayer } from "@wear3d/design-schema";
 import { TSHIRT_CLASSIC } from "@wear3d/garment-engine";
 import { beforeEach, describe, expect, it } from "vitest";
-import { useStudio } from "./store";
+import { patternZones, selectedLayerId, useStudio } from "./store";
 
 function init() {
   const doc = createEmptyDocument(
@@ -34,7 +34,7 @@ describe("store du studio", () => {
     const s = useStudio.getState();
     const layer = createTextLayer("BODY_FRONT", "WEAR3D");
     s.addLayer(layer);
-    expect(useStudio.getState().selectedLayerId).toBe(layer.id);
+    expect(selectedLayerId()).toBe(layer.id);
 
     s.updateLayer(layer.id, (l) => ({ ...l, transform: { ...l.transform, x: 0.2 } }), "drag");
     s.updateLayer(layer.id, (l) => ({ ...l, transform: { ...l.transform, x: 0.25 } }), "drag");
@@ -42,7 +42,7 @@ describe("store du studio", () => {
 
     s.removeLayer(layer.id);
     expect(useStudio.getState().doc?.layers).toHaveLength(0);
-    expect(useStudio.getState().selectedLayerId).toBeNull();
+    expect(useStudio.getState().selection).toBeNull();
 
     useStudio.getState().undo(); // annule la suppression
     useStudio.getState().undo(); // annule le glisser (une seule étape)
@@ -58,5 +58,37 @@ describe("store du studio", () => {
     expect(layers).toHaveLength(2);
     expect(layers[1]!.id).not.toBe(layer.id);
     expect(layers[1]!.transform.x).toBeCloseTo(layer.transform.x + 0.03);
+  });
+
+  it("réordonne les calques par glisser-déposer", () => {
+    const s = useStudio.getState();
+    const a = createTextLayer("BODY_FRONT", "A");
+    const b = createTextLayer("BODY_FRONT", "B");
+    const c = createImageLayer("BODY_FRONT", "logo");
+    s.addLayer(a);
+    s.addLayer(b);
+    s.addLayer(c);
+    s.moveLayerTo(c.id, 0);
+    expect(useStudio.getState().doc!.layers.map((l) => l.id)).toEqual([c.id, a.id, b.id]);
+  });
+
+  it("pose et retire un motif sur plusieurs zones", () => {
+    const s = useStudio.getState();
+    const pattern = {
+      assetId: "pattern:band-diagonal",
+      mode: "placed" as const,
+      color: "#FFFFFF",
+      scale: 1,
+      rotation: 0,
+      offsetX: 0,
+      offsetY: 0,
+      opacity: 0.8,
+    };
+    s.setZonesPattern(["BODY_FRONT", "BODY_BACK"], pattern);
+    expect(patternZones(useStudio.getState().doc)).toEqual(["BODY_FRONT", "BODY_BACK"]);
+    s.setZonesPattern(["BODY_FRONT", "BODY_BACK"], undefined);
+    expect(patternZones(useStudio.getState().doc)).toEqual([]);
+    useStudio.getState().undo();
+    expect(patternZones(useStudio.getState().doc)).toHaveLength(2);
   });
 });

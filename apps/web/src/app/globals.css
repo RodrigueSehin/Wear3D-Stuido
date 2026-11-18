@@ -79,3 +79,31 @@
     letter-spacing: -0.02em;
   }
 }
+
+/* Curseur 360° du studio : piste fine, poignée blanche cerclée de bleu. */
+@layer components {
+  .studio-range {
+    appearance: none;
+    height: 6px;
+    border-radius: 999px;
+    background: rgb(11 21 48 / 0.12);
+    cursor: pointer;
+  }
+  .studio-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: #fff;
+    border: 3px solid var(--action);
+    box-shadow: 0 2px 8px rgb(15 35 90 / 0.25);
+  }
+  .studio-range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #fff;
+    border: 3px solid var(--action);
+    box-shadow: 0 2px 8px rgb(15 35 90 / 0.25);
+  }
+}

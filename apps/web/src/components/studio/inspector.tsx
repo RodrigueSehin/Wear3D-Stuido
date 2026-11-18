@@ -1,190 +1,110 @@
 "use client";
 
-import { layerLabel, type Layer } from "@wear3d/design-schema";
-import { effectiveDpi, MIN_PRINT_DPI } from "@wear3d/editor-2d";
-import { cn } from "@wear3d/ui";
 import {
-  ArrowDown,
-  ArrowUp,
-  Copy,
-  Eye,
-  EyeOff,
-  Hash,
-  ImageIcon,
+  BLEND_MODES,
+  layerLabel,
+  MATERIAL_CODES,
+  type BlendMode,
+  type Layer,
+} from "@wear3d/design-schema";
+import { effectiveDpi, layerSizePx, MIN_PRINT_DPI, zoneRectPx } from "@wear3d/editor-2d";
+import { ATLAS_SIZE, FABRIC_NAMES } from "@wear3d/garment-engine";
+import { cn, Slider, Switch } from "@wear3d/ui";
+import {
+  ChevronsRight,
+  Contrast,
+  FlipHorizontal2,
+  FlipVertical2,
+  Link2,
   Lock,
   LockOpen,
+  RotateCw,
   Trash2,
   TriangleAlert,
-  Type,
+  Unlink2,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { getCachedImage } from "@/lib/studio/assets";
+import { useAtlas } from "@/lib/studio/atlas";
 import { NUMBER_STYLES, STUDIO_FONTS } from "@/lib/studio/fonts";
-import { useSelectedLayer, useStudio } from "@/lib/studio/store";
+import { PATTERNS, patternPreview, PATTERN_PREFIX } from "@/lib/studio/patterns";
+import { patternZones, useSelectedLayer, useStudio } from "@/lib/studio/store";
+import { ColorField, NumberBox, PanelCard, PanelTitle, Section, SelectBox } from "./controls";
 
-/** Inspecteur (300 px, CDC §7.2) : propriétés de la sélection, calques. */
+const BLEND_LABELS: Record<BlendMode, string> = {
+  normal: "Normal",
+  multiply: "Produit",
+  screen: "Superposition claire",
+  overlay: "Incrustation",
+  darken: "Assombrir",
+  lighten: "Éclaircir",
+};
+
+const EXPORT = ATLAS_SIZE.export;
+
 export function Inspector() {
-  const [tab, setTab] = useState<"props" | "layers">("layers");
-  const selected = useSelectedLayer();
-  const active = selected && tab === "layers" ? "props" : tab;
-
+  useAtlas((s) => s.version); // vignettes et dpi à jour une fois les images chargées
+  const setOpen = useStudio((s) => s.setInspectorOpen);
+  const selection = useStudio((s) => s.selection);
+  const layer = useSelectedLayer();
   return (
-    <aside
-      className="border-border bg-surface hidden w-[300px] shrink-0 flex-col border-l lg:flex"
-      aria-label="Inspecteur"
-    >
-      <div className="border-border flex border-b px-4" role="tablist">
-        {(
-          [
-            ["props", "Personnalisation"],
-            ["layers", "Calques"],
-          ] as const
-        ).map(([id, label]) => (
+    <PanelCard className="w-[300px] shrink-0">
+      <PanelTitle
+        action={
           <button
-            key={id}
             type="button"
-            role="tab"
-            aria-selected={active === id}
-            onClick={() => {
-              setTab(id);
-              if (id === "layers") useStudio.getState().selectLayer(null);
-            }}
-            className={cn(
-              "-mb-px flex-1 border-b-2 py-3 text-sm font-medium",
-              active === id
-                ? "border-action text-action"
-                : "text-muted-foreground border-transparent",
-            )}
+            onClick={() => setOpen(false)}
+            className="hover:bg-surface-muted rounded-md p-1"
+            aria-label="Replier l'inspecteur"
           >
-            {label}
+            <ChevronsRight className="size-5" aria-hidden />
           </button>
-        ))}
-      </div>
-      <div className="flex-1 overflow-y-auto p-4">
-        {active === "props" && selected ? <LayerProperties layer={selected} /> : null}
-        {active === "props" && !selected ? (
-          <p className="text-muted-foreground text-sm">
-            Sélectionnez un élément sur le vêtement ou dans les calques.
+        }
+      >
+        Inspecteur
+      </PanelTitle>
+      <div className="min-h-0 flex-1 overflow-y-auto pb-4">
+        {layer && <LayerInspector key={layer.id} layer={layer} />}
+        {selection?.kind === "base" && <BaseInspector />}
+        {selection?.kind === "pattern" && <PatternInspector />}
+        {!selection && (
+          <p className="text-muted-foreground px-5 text-sm">
+            Sélectionnez un calque, un élément sur le vêtement ou la couleur de base.
           </p>
-        ) : null}
-        {active === "layers" && <LayerList />}
+        )}
       </div>
-    </aside>
+    </PanelCard>
   );
 }
 
-const ICONS = { text: Type, number: Hash, image: ImageIcon } as const;
+/* ---------- Calque ---------- */
 
-function LayerList() {
-  const layers = useStudio((s) => s.doc?.layers ?? []);
+function useLayerUpdate(layer: Layer) {
+  const { updateLayer } = useStudio.getState();
+  return (patch: (l: Layer) => Layer, key: string) =>
+    updateLayer(layer.id, patch, `${key}:${layer.id}`);
+}
+
+function LayerInspector({ layer }: { layer: Layer }) {
   const definition = useStudio((s) => s.definition);
-  const selectedId = useStudio((s) => s.selectedLayerId);
-  const { selectLayer, updateLayer, removeLayer, reorderLayer, seal } = useStudio.getState();
-  const zoneLabel = (code: string) => definition?.zones.find((z) => z.code === code)?.label ?? code;
-
-  if (!layers.length) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        Aucun calque. Ajoutez un texte, un numéro ou un logo depuis le rail d&apos;outils.
-      </p>
-    );
-  }
-
-  const toggle = (id: string, key: "visible" | "locked") => {
-    seal();
-    updateLayer(id, (l) => ({ ...l, [key]: !l[key] }), `toggle:${key}:${id}`);
+  const recent = useStudio((s) => s.recentColors);
+  const { seal, removeLayer, pushRecentColor } = useStudio.getState();
+  const set = useLayerUpdate(layer);
+  const zone = definition?.zones.find((z) => z.code === layer.zone);
+  const zonePx = zone
+    ? zoneRectPx({ code: zone.code, ...zone.uvRect }, EXPORT)
+    : { x: 0, y: 0, w: 1, h: 1 };
+  const aspect = (id: string) => {
+    const img = getCachedImage(id);
+    return img ? img.width / img.height : undefined;
+  };
+  const size = layerSizePx(layer, zonePx, aspect);
+  const [linked, setLinked] = useState(true);
+  const t = layer.transform;
+  const commitColor = (c: string) => {
+    pushRecentColor(c);
     seal();
   };
-
-  return (
-    <ul className="flex flex-col gap-1">
-      {[...layers].reverse().map((layer) => {
-        const Icon = ICONS[layer.type];
-        return (
-          <li
-            key={layer.id}
-            className={cn(
-              "group flex items-center gap-2 rounded-md px-2 py-1.5",
-              selectedId === layer.id ? "bg-action-soft" : "hover:bg-surface-muted",
-            )}
-          >
-            <button
-              type="button"
-              onClick={() => selectLayer(layer.id)}
-              className="flex min-w-0 flex-1 items-center gap-2 text-left"
-            >
-              <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden />
-              <span className="min-w-0">
-                <span
-                  className={cn(
-                    "block truncate text-sm",
-                    !layer.visible && "text-muted-foreground line-through",
-                  )}
-                >
-                  {layerLabel(layer)}
-                </span>
-                <span className="text-muted-foreground block text-[11px]">
-                  {zoneLabel(layer.zone)}
-                </span>
-              </span>
-            </button>
-            <IconButton label="Monter" onClick={() => reorderLayer(layer.id, "up")}>
-              <ArrowUp />
-            </IconButton>
-            <IconButton label="Descendre" onClick={() => reorderLayer(layer.id, "down")}>
-              <ArrowDown />
-            </IconButton>
-            <IconButton
-              label={layer.locked ? "Déverrouiller" : "Verrouiller"}
-              onClick={() => toggle(layer.id, "locked")}
-            >
-              {layer.locked ? <Lock /> : <LockOpen />}
-            </IconButton>
-            <IconButton
-              label={layer.visible ? "Masquer" : "Afficher"}
-              onClick={() => toggle(layer.id, "visible")}
-            >
-              {layer.visible ? <Eye /> : <EyeOff />}
-            </IconButton>
-            <IconButton label="Supprimer" onClick={() => removeLayer(layer.id)}>
-              <Trash2 />
-            </IconButton>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded p-1 focus-visible:outline-none focus-visible:ring-2 [&_svg]:size-3.5"
-    >
-      {children}
-    </button>
-  );
-}
-
-function LayerProperties({ layer }: { layer: Layer }) {
-  const definition = useStudio((s) => s.definition);
-  const { updateLayer, removeLayer, duplicateLayer, seal } = useStudio.getState();
-  const set = (patch: (l: Layer) => Layer, key: string) =>
-    updateLayer(layer.id, patch, `${key}:${layer.id}`);
-  const t = layer.transform;
-  const zone = definition?.zones.find((z) => z.code === layer.zone);
 
   let dpiWarning: number | null = null;
   if (layer.type === "image" && zone?.printAreaMm) {
@@ -195,77 +115,112 @@ function LayerProperties({ layer }: { layer: Layer }) {
     }
   }
 
+  const setW = (px: number) =>
+    set((l) => {
+      const w = Math.max(1, px) / zonePx.w;
+      const ratio = w / l.transform.w;
+      return {
+        ...l,
+        transform: {
+          ...l.transform,
+          w,
+          ...(linked && l.transform.h !== undefined ? { h: l.transform.h * ratio } : {}),
+        },
+      };
+    }, "w");
+
+  const setH = (px: number) =>
+    set((l) => {
+      const h = Math.max(1, px) / zonePx.h;
+      if (linked) {
+        const ratio = Math.max(1, px) / Math.max(1, size.h);
+        return {
+          ...l,
+          transform: {
+            ...l.transform,
+            w: l.transform.w * ratio,
+            ...(l.transform.h !== undefined ? { h } : {}),
+          },
+        };
+      }
+      return { ...l, transform: { ...l.transform, h } };
+    }, "h");
+
   return (
-    <div className="flex flex-col gap-4" onPointerUp={seal} onBlur={seal}>
-      <div className="flex items-center justify-between">
-        <p className="truncate font-semibold">{layerLabel(layer)}</p>
-        <div className="flex gap-1">
-          <IconButton label="Dupliquer (Ctrl+D)" onClick={() => duplicateLayer(layer.id)}>
-            <Copy />
-          </IconButton>
-          <IconButton label="Supprimer (Suppr)" onClick={() => removeLayer(layer.id)}>
-            <Trash2 />
-          </IconButton>
-        </div>
+    <div onPointerUp={seal}>
+      <div className="flex items-center gap-3 px-5 pb-4">
+        <LayerIcon layer={layer} />
+        <input
+          value={layer.name ?? layerLabel(layer)}
+          onChange={(e) => set((l) => ({ ...l, name: e.target.value.slice(0, 80) }), "name")}
+          onBlur={seal}
+          aria-label="Nom du calque"
+          className="focus:border-action min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[17px] font-semibold text-[#0b1530] outline-none"
+        />
+        <button
+          type="button"
+          aria-label={layer.locked ? "Déverrouiller" : "Verrouiller"}
+          aria-pressed={layer.locked}
+          onClick={() => {
+            seal();
+            set((l) => ({ ...l, locked: !l.locked }), "lock");
+            seal();
+          }}
+          className="hover:bg-surface-muted rounded-md p-1 text-[#0b1530]"
+        >
+          {layer.locked ? (
+            <Lock className="size-5" aria-hidden />
+          ) : (
+            <LockOpen className="size-5" aria-hidden />
+          )}
+        </button>
       </div>
 
       {dpiWarning !== null && (
         <p
           role="alert"
-          className="bg-accent-amber-soft text-foreground flex gap-2 rounded-md p-2 text-xs"
+          className="bg-accent-amber-soft mx-5 mb-3 flex gap-2 rounded-lg p-2 text-xs"
         >
           <TriangleAlert className="text-warning size-4 shrink-0" aria-hidden />
-          Résolution insuffisante pour l&apos;impression : {dpiWarning} dpi à cette taille (minimum{" "}
-          {MIN_PRINT_DPI}). Réduisez le logo ou importez un fichier plus grand.
+          Résolution insuffisante pour l&apos;impression : {dpiWarning} dpi (minimum {MIN_PRINT_DPI}
+          ).
         </p>
       )}
 
       {layer.type === "text" && (
-        <>
-          <Field label="Texte">
-            <input
-              value={layer.text.value}
-              maxLength={200}
-              onChange={(e) =>
-                set(
-                  (l) =>
-                    l.type === "text" ? { ...l, text: { ...l.text, value: e.target.value } } : l,
-                  "value",
-                )
-              }
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Police">
-            <select
-              value={layer.text.font}
-              onChange={(e) => {
-                const key = e.target.value as keyof typeof STUDIO_FONTS;
-                set(
-                  (l) =>
-                    l.type === "text"
-                      ? { ...l, text: { ...l.text, font: key, weight: STUDIO_FONTS[key].weight } }
-                      : l,
-                  "font",
-                );
-              }}
-              className={inputCls}
-            >
-              {Object.entries(STUDIO_FONTS).map(([k, f]) => (
-                <option key={k} value={k}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <ColorField
-            label="Couleur"
-            value={layer.text.color}
-            onChange={(c) =>
-              set((l) => (l.type === "text" ? { ...l, text: { ...l.text, color: c } } : l), "color")
+        <Section title="Texte">
+          <input
+            value={layer.text.value}
+            maxLength={200}
+            onChange={(e) =>
+              set(
+                (l) =>
+                  l.type === "text" ? { ...l, text: { ...l.text, value: e.target.value } } : l,
+                "value",
+              )
             }
+            onBlur={seal}
+            aria-label="Contenu du texte"
+            className="border-border focus:border-action h-10 rounded-lg border bg-white px-3 text-sm outline-none"
           />
-          <Slider
+          <SelectBox
+            ariaLabel="Police"
+            value={layer.text.font}
+            onChange={(v) => {
+              const k = v as keyof typeof STUDIO_FONTS;
+              seal();
+              set(
+                (l) =>
+                  l.type === "text"
+                    ? { ...l, text: { ...l.text, font: k, weight: STUDIO_FONTS[k].weight } }
+                    : l,
+                "font",
+              );
+              seal();
+            }}
+            options={Object.entries(STUDIO_FONTS).map(([value, f]) => ({ value, label: f.label }))}
+          />
+          <LabeledSlider
             label="Taille"
             value={layer.text.size}
             min={0.02}
@@ -276,7 +231,7 @@ function LayerProperties({ layer }: { layer: Layer }) {
               set((l) => (l.type === "text" ? { ...l, text: { ...l.text, size: v } } : l), "size")
             }
           />
-          <Slider
+          <LabeledSlider
             label="Espacement"
             value={layer.text.letterSpacing}
             min={-0.1}
@@ -290,16 +245,17 @@ function LayerProperties({ layer }: { layer: Layer }) {
               )
             }
           />
-        </>
+        </Section>
       )}
 
       {layer.type === "number" && (
-        <>
-          <Field label="Numéro">
+        <Section title="Numéro">
+          <div className="grid grid-cols-2 gap-2">
             <input
               value={layer.number.value}
               inputMode="numeric"
               maxLength={3}
+              aria-label="Numéro"
               onChange={(e) => {
                 const v = e.target.value.replace(/\D/g, "").slice(0, 3);
                 set(
@@ -307,156 +263,283 @@ function LayerProperties({ layer }: { layer: Layer }) {
                   "value",
                 );
               }}
-              className={inputCls}
+              onBlur={seal}
+              className="border-border focus:border-action h-10 rounded-lg border bg-white px-3 text-sm outline-none"
             />
-          </Field>
-          <Field label="Style">
-            <select
+            <SelectBox
+              ariaLabel="Style de numéro"
               value={layer.number.style}
-              onChange={(e) =>
+              onChange={(v) => {
+                seal();
                 set(
-                  (l) =>
-                    l.type === "number"
-                      ? { ...l, number: { ...l.number, style: e.target.value } }
-                      : l,
+                  (l) => (l.type === "number" ? { ...l, number: { ...l.number, style: v } } : l),
                   "style",
-                )
-              }
-              className={inputCls}
-            >
-              {Object.entries(NUMBER_STYLES).map(([k, s]) => (
-                <option key={k} value={k}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <ColorField
-            label="Couleur"
-            value={layer.number.color}
-            onChange={(c) =>
-              set(
-                (l) => (l.type === "number" ? { ...l, number: { ...l.number, color: c } } : l),
-                "color",
-              )
-            }
-          />
-        </>
+                );
+                seal();
+              }}
+              options={Object.entries(NUMBER_STYLES).map(([value, s]) => ({
+                value,
+                label: s.label,
+              }))}
+            />
+          </div>
+        </Section>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <NumberField
-          label="X"
-          value={t.x * 100}
-          suffix="%"
-          onChange={(v) => set((l) => ({ ...l, transform: { ...l.transform, x: v / 100 } }), "x")}
+      <Section title="Transformation">
+        <div className="grid grid-cols-2 gap-3">
+          <NumberBox
+            label="X"
+            unit="px"
+            value={Math.round(t.x * zonePx.w)}
+            onChange={(v) =>
+              set((l) => ({ ...l, transform: { ...l.transform, x: v / zonePx.w } }), "x")
+            }
+          />
+          <NumberBox
+            label="Y"
+            unit="px"
+            value={Math.round(t.y * zonePx.h)}
+            onChange={(v) =>
+              set((l) => ({ ...l, transform: { ...l.transform, y: v / zonePx.h } }), "y")
+            }
+          />
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <NumberBox label="W" unit="px" value={Math.round(size.w)} min={1} onChange={setW} />
+          <button
+            type="button"
+            onClick={() => setLinked(!linked)}
+            aria-pressed={linked}
+            aria-label={linked ? "Délier largeur et hauteur" : "Lier largeur et hauteur"}
+            className={cn("rounded-md p-1", linked ? "text-action" : "text-muted-foreground")}
+          >
+            {linked ? (
+              <Link2 className="size-5" aria-hidden />
+            ) : (
+              <Unlink2 className="size-5" aria-hidden />
+            )}
+          </button>
+          <NumberBox label="H" unit="px" value={Math.round(size.h)} min={1} onChange={setH} />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-16 text-sm text-[#0b1530]">Rotation</span>
+          <NumberBox
+            label={<RotateCw className="size-4" aria-hidden />}
+            unit="°"
+            value={Math.round(t.rotation)}
+            min={-360}
+            max={360}
+            onChange={(v) =>
+              set((l) => ({ ...l, transform: { ...l.transform, rotation: v } }), "rotation")
+            }
+            className="flex-1"
+          />
+          <button
+            type="button"
+            aria-label="Symétrie horizontale"
+            aria-pressed={t.flipX}
+            onClick={() => {
+              seal();
+              set(
+                (l) => ({ ...l, transform: { ...l.transform, flipX: !l.transform.flipX } }),
+                "flipX",
+              );
+              seal();
+            }}
+            className={cn(
+              "border-border flex size-10 items-center justify-center rounded-lg border bg-white",
+              t.flipX && "border-action text-action",
+            )}
+          >
+            <FlipHorizontal2 className="size-5" aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label="Symétrie verticale"
+            aria-pressed={t.flipY}
+            onClick={() => {
+              seal();
+              set(
+                (l) => ({ ...l, transform: { ...l.transform, flipY: !l.transform.flipY } }),
+                "flipY",
+              );
+              seal();
+            }}
+            className={cn(
+              "border-border flex size-10 items-center justify-center rounded-lg border bg-white",
+              t.flipY && "border-action text-action",
+            )}
+          >
+            <FlipVertical2 className="size-5" aria-hidden />
+          </button>
+        </div>
+      </Section>
+
+      <Section title="Apparence">
+        <span className="text-sm text-[#0b1530]">Opacité</span>
+        <div className="flex items-center gap-3">
+          <Slider
+            value={[Math.round(layer.opacity * 100)]}
+            min={0}
+            max={100}
+            step={1}
+            onValueChange={([v]) => set((l) => ({ ...l, opacity: (v ?? 100) / 100 }), "opacity")}
+            onValueCommit={() => seal()}
+            aria-label="Opacité"
+          />
+          <NumberBox
+            value={Math.round(layer.opacity * 100)}
+            unit="%"
+            min={0}
+            max={100}
+            onChange={(v) => set((l) => ({ ...l, opacity: v / 100 }), "opacity")}
+            className="w-[74px] shrink-0"
+          />
+        </div>
+        <span className="text-sm text-[#0b1530]">Mode de fusion</span>
+        <SelectBox
+          ariaLabel="Mode de fusion"
+          value={layer.blendMode}
+          onChange={(v) => {
+            seal();
+            set((l) => ({ ...l, blendMode: v as BlendMode }), "blend");
+            seal();
+          }}
+          options={BLEND_MODES.map((m) => ({ value: m, label: BLEND_LABELS[m] }))}
         />
-        <NumberField
-          label="Y"
-          value={t.y * 100}
-          suffix="%"
-          onChange={(v) => set((l) => ({ ...l, transform: { ...l.transform, y: v / 100 } }), "y")}
+      </Section>
+
+      <Section title="Effets">
+        {(
+          [
+            ["shadow", "Ombre portée"],
+            ["outline", "Contour"],
+            ["glow", "Lueur"],
+          ] as const
+        ).map(([key, label]) => (
+          <label key={key} className="flex items-center gap-3 text-[15px] text-[#0b1530]">
+            <Contrast className="size-5" aria-hidden />
+            <span className="flex-1">{label}</span>
+            <Switch
+              checked={layer.effects[key].enabled}
+              onCheckedChange={(enabled) => {
+                seal();
+                set(
+                  (l) => ({
+                    ...l,
+                    effects: { ...l.effects, [key]: { ...l.effects[key], enabled } },
+                  }),
+                  `fx-${key}`,
+                );
+                seal();
+              }}
+            />
+          </label>
+        ))}
+      </Section>
+
+      <Section title="Couleur" defaultOpen={false}>
+        {(layer.type === "text" || layer.type === "number") && (
+          <ColorField
+            label="Remplissage"
+            value={layer.type === "text" ? layer.text.color : layer.number.color}
+            recent={recent}
+            onChange={(c) =>
+              set(
+                (l) =>
+                  l.type === "text"
+                    ? { ...l, text: { ...l.text, color: c } }
+                    : l.type === "number"
+                      ? { ...l, number: { ...l.number, color: c } }
+                      : l,
+                "fill",
+              )
+            }
+            onCommit={commitColor}
+          />
+        )}
+        <ColorField
+          label="Contour"
+          value={layer.effects.outline.color}
+          recent={recent}
+          onChange={(c) =>
+            set(
+              (l) => ({
+                ...l,
+                effects: { ...l.effects, outline: { ...l.effects.outline, color: c } },
+              }),
+              "outline-color",
+            )
+          }
+          onCommit={commitColor}
         />
+        <ColorField
+          label="Lueur"
+          value={layer.effects.glow.color}
+          recent={recent}
+          onChange={(c) =>
+            set(
+              (l) => ({ ...l, effects: { ...l.effects, glow: { ...l.effects.glow, color: c } } }),
+              "glow-color",
+            )
+          }
+          onCommit={commitColor}
+        />
+        <ColorField
+          label="Ombre"
+          value={layer.effects.shadow.color}
+          recent={recent}
+          onChange={(c) =>
+            set(
+              (l) => ({
+                ...l,
+                effects: { ...l.effects, shadow: { ...l.effects.shadow, color: c } },
+              }),
+              "shadow-color",
+            )
+          }
+          onCommit={commitColor}
+        />
+      </Section>
+
+      <div className="px-5 pt-4">
+        <button
+          type="button"
+          onClick={() => removeLayer(layer.id)}
+          className="text-danger hover:bg-danger/10 flex h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold"
+        >
+          <Trash2 className="size-4" aria-hidden /> Supprimer le calque
+        </button>
       </div>
-      <Slider
-        label="Largeur"
-        value={t.w}
-        min={0.03}
-        max={1}
-        step={0.005}
-        format={(v) => `${Math.round(v * 100)} %`}
-        onChange={(v) => set((l) => ({ ...l, transform: { ...l.transform, w: v } }), "w")}
-      />
-      <Slider
-        label="Rotation"
-        value={t.rotation}
-        min={-180}
-        max={180}
-        step={1}
-        format={(v) => `${Math.round(v)}°`}
-        onChange={(v) =>
-          set((l) => ({ ...l, transform: { ...l.transform, rotation: v } }), "rotation")
-        }
-      />
-      <Slider
-        label="Opacité"
-        value={layer.opacity}
-        min={0}
-        max={1}
-        step={0.01}
-        format={(v) => `${Math.round(v * 100)} %`}
-        onChange={(v) => set((l) => ({ ...l, opacity: v }), "opacity")}
-      />
     </div>
   );
 }
 
-const inputCls =
-  "border-border bg-surface h-9 w-full rounded-md border px-2 text-sm focus:border-action focus:outline-none";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-muted-foreground text-xs font-medium">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function ColorField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (c: string) => void;
-}) {
-  return (
-    <Field label={label}>
-      <span className="border-border flex h-9 items-center gap-2 rounded-md border px-2">
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value.toUpperCase())}
-          className="size-6 cursor-pointer rounded border-0 bg-transparent p-0"
-        />
-        <span className="font-mono text-xs">{value.toUpperCase()}</span>
+function LayerIcon({ layer }: { layer: Layer }) {
+  if (layer.type === "image") {
+    const src = getCachedImage(layer.assetId);
+    return (
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
+        {src && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={(src.image as HTMLImageElement).src}
+            alt=""
+            className="max-h-9 max-w-9 object-contain"
+          />
+        )}
       </span>
-    </Field>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  suffix,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  suffix: string;
-  onChange: (v: number) => void;
-}) {
+    );
+  }
   return (
-    <label className="border-border flex h-9 items-center gap-1 rounded-md border px-2 text-sm">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <input
-        type="number"
-        value={Math.round(value * 10) / 10}
-        step={0.5}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          if (Number.isFinite(v)) onChange(Math.min(100, Math.max(0, v)));
-        }}
-        className="w-full bg-transparent text-right focus:outline-none"
-      />
-      <span className="text-muted-foreground text-xs">{suffix}</span>
-    </label>
+    <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#0a1638] text-lg font-bold text-white">
+      {layer.type === "number" ? layer.number.value || "#" : "T"}
+    </span>
   );
 }
 
-function Slider({
+function LabeledSlider({
   label,
   value,
   min,
@@ -474,20 +557,214 @@ function Slider({
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="flex justify-between text-xs">
-        <span className="text-muted-foreground font-medium">{label}</span>
-        <span className="font-mono">{format(value)}</span>
-      </span>
-      <input
-        type="range"
+    <div>
+      <div className="flex justify-between text-sm">
+        <span className="text-[#0b1530]">{label}</span>
+        <span className="font-mono text-xs">{format(value)}</span>
+      </div>
+      <Slider
+        value={[value]}
         min={min}
         max={max}
         step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="accent-[var(--action)]"
+        aria-label={label}
+        onValueChange={([v]) => onChange(v ?? value)}
+        onValueCommit={() => useStudio.getState().seal()}
       />
-    </label>
+    </div>
+  );
+}
+
+/* ---------- Couleur de base ---------- */
+
+function BaseInspector() {
+  const definition = useStudio((s) => s.definition);
+  const doc = useStudio((s) => s.doc);
+  const selectedZone = useStudio((s) => s.selectedZone);
+  const recent = useStudio((s) => s.recentColors);
+  const { selectZone, setZoneColor, setZonesColor, setZoneMaterial, pushRecentColor, seal } =
+    useStudio.getState();
+  const zone = selectedZone ?? definition?.zones[0]?.code ?? "";
+  const style = doc?.zones[zone];
+  if (!definition || !style) return null;
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-5 pb-4">
+        <span
+          className="size-11 rounded-lg border border-black/5 shadow-sm"
+          style={{ background: style.color }}
+        />
+        <span className="text-[17px] font-semibold text-[#0b1530]">Couleur de base</span>
+      </div>
+      <Section title="Zone">
+        <SelectBox
+          ariaLabel="Zone du vêtement"
+          value={zone}
+          onChange={selectZone}
+          options={definition.zones.map((z) => ({ value: z.code, label: z.label }))}
+        />
+      </Section>
+      <Section title="Couleur">
+        <ColorField
+          label="Couleur de la zone"
+          value={style.color}
+          recent={recent}
+          onChange={(c) => setZoneColor(zone, c)}
+          onCommit={(c) => {
+            pushRecentColor(c);
+            seal();
+          }}
+        />
+        <button
+          type="button"
+          onClick={() =>
+            setZonesColor(
+              definition.zones.map((z) => z.code),
+              style.color,
+            )
+          }
+          className="border-border hover:bg-surface-muted h-10 rounded-lg border bg-white text-sm font-semibold"
+        >
+          Appliquer à toutes les zones
+        </button>
+      </Section>
+      <Section title="Tissu">
+        <SelectBox
+          ariaLabel="Tissu de la zone"
+          value={style.material}
+          onChange={(v) => setZoneMaterial(zone, v as (typeof MATERIAL_CODES)[number])}
+          options={MATERIAL_CODES.filter((m) => definition.materials.includes(m)).map((m) => ({
+            value: m,
+            label: `${FABRIC_NAMES[m].name} — ${FABRIC_NAMES[m].subtitle}`,
+          }))}
+        />
+      </Section>
+    </div>
+  );
+}
+
+/* ---------- Motif graphique ---------- */
+
+function PatternInspector() {
+  const doc = useStudio((s) => s.doc);
+  const recent = useStudio((s) => s.recentColors);
+  const zones = patternZones(doc);
+  const pattern = zones[0] ? doc?.zones[zones[0]]?.pattern : undefined;
+  const base = zones[0] ? (doc?.zones[zones[0]]?.color ?? "#1D4ED8") : "#1D4ED8";
+  const { setZonesPattern, seal, pushRecentColor } = useStudio.getState();
+  const preview = useMemo(
+    () => (pattern ? patternPreview(pattern.assetId, pattern.color, base) : ""),
+    [pattern, base],
+  );
+  if (!pattern) {
+    return <p className="text-muted-foreground px-5 text-sm">Aucun motif appliqué.</p>;
+  }
+  const patch = (p: Partial<typeof pattern>, key: string) =>
+    setZonesPattern(zones, { ...pattern, ...p }, `pattern-${key}`);
+  return (
+    <div onPointerUp={seal}>
+      <div className="flex items-center gap-3 px-5 pb-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={preview} alt="" className="size-11 rounded-lg shadow-sm" />
+        <span className="text-[17px] font-semibold text-[#0b1530]">Motif graphique</span>
+      </div>
+      <Section title="Motif">
+        <SelectBox
+          ariaLabel="Motif"
+          value={pattern.assetId}
+          onChange={(v) => {
+            const def = PATTERNS.find((p) => `${PATTERN_PREFIX}${p.code}` === v);
+            seal();
+            patch({ assetId: v, mode: def?.mode ?? pattern.mode }, "asset");
+            seal();
+          }}
+          options={PATTERNS.map((p) => ({ value: `${PATTERN_PREFIX}${p.code}`, label: p.label }))}
+        />
+        <SelectBox
+          ariaLabel="Disposition"
+          value={pattern.mode}
+          onChange={(v) => {
+            seal();
+            patch({ mode: v as "placed" | "repeat" }, "mode");
+            seal();
+          }}
+          options={[
+            { value: "placed", label: "Placé (une fois)" },
+            { value: "repeat", label: "Répété" },
+          ]}
+        />
+        <ColorField
+          label="Couleur du motif"
+          value={pattern.color}
+          recent={recent}
+          onChange={(c) => patch({ color: c }, "color")}
+          onCommit={(c) => {
+            pushRecentColor(c);
+            seal();
+          }}
+        />
+      </Section>
+      <Section title="Transformation">
+        <LabeledSlider
+          label="Échelle"
+          value={pattern.scale}
+          min={0.2}
+          max={3}
+          step={0.05}
+          format={(v) => `${Math.round(v * 100)} %`}
+          onChange={(v) => patch({ scale: v }, "scale")}
+        />
+        <LabeledSlider
+          label="Rotation"
+          value={pattern.rotation}
+          min={-180}
+          max={180}
+          step={1}
+          format={(v) => `${Math.round(v)}°`}
+          onChange={(v) => patch({ rotation: v }, "rotation")}
+        />
+        <LabeledSlider
+          label="Décalage horizontal"
+          value={pattern.offsetX}
+          min={-0.5}
+          max={0.5}
+          step={0.01}
+          format={(v) => `${Math.round(v * 100)} %`}
+          onChange={(v) => patch({ offsetX: v }, "ox")}
+        />
+        <LabeledSlider
+          label="Décalage vertical"
+          value={pattern.offsetY}
+          min={-0.5}
+          max={0.5}
+          step={0.01}
+          format={(v) => `${Math.round(v * 100)} %`}
+          onChange={(v) => patch({ offsetY: v }, "oy")}
+        />
+      </Section>
+      <Section title="Apparence">
+        <LabeledSlider
+          label="Opacité"
+          value={pattern.opacity}
+          min={0}
+          max={1}
+          step={0.01}
+          format={(v) => `${Math.round(v * 100)} %`}
+          onChange={(v) => patch({ opacity: v }, "opacity")}
+        />
+      </Section>
+      <div className="px-5 pt-4">
+        <button
+          type="button"
+          onClick={() => {
+            setZonesPattern(zones, undefined);
+            useStudio.getState().select({ kind: "base" });
+          }}
+          className="text-danger hover:bg-danger/10 flex h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold"
+        >
+          <Trash2 className="size-4" aria-hidden /> Retirer le motif
+        </button>
+      </div>
+    </div>
   );
 }

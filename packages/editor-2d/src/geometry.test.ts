@@ -27,14 +27,14 @@ describe("atlasUvToZone", () => {
 describe("hitTestLayer", () => {
   it("touche le centre d'une image et pas un point éloigné", () => {
     const img = createImageLayer("BODY_FRONT", "a1");
-    img.transform = { x: 0.5, y: 0.5, w: 0.2, rotation: 0 };
+    img.transform = { x: 0.5, y: 0.5, w: 0.2, rotation: 0, flipX: false, flipY: false };
     expect(hitTestLayer(img, px, { x: 0.5, y: 0.5 })).toBe(true);
     expect(hitTestLayer(img, px, { x: 0.9, y: 0.5 })).toBe(false);
   });
 
   it("tient compte de la rotation", () => {
     const text = createTextLayer("BODY_FRONT");
-    text.transform = { x: 0.5, y: 0.5, w: 0.8, rotation: 90 };
+    text.transform = { x: 0.5, y: 0.5, w: 0.8, rotation: 90, flipX: false, flipY: false };
     // Texte large tourné de 90° : un point au-dessus (axe y) est dedans, à droite non.
     expect(hitTestLayer(text, px, { x: 0.5, y: 0.75 })).toBe(true);
     expect(hitTestLayer(text, px, { x: 0.85, y: 0.5 })).toBe(false);
@@ -46,7 +46,8 @@ describe("pickLayer", () => {
     const a = createImageLayer("BODY_FRONT", "a");
     const b = createImageLayer("BODY_FRONT", "b");
     const locked = { ...createImageLayer("BODY_FRONT", "c"), locked: true };
-    for (const l of [a, b, locked]) l.transform = { x: 0.5, y: 0.5, w: 0.3, rotation: 0 };
+    for (const l of [a, b, locked])
+      l.transform = { x: 0.5, y: 0.5, w: 0.3, rotation: 0, flipX: false, flipY: false };
     expect(pickLayer([a, b, locked], "BODY_FRONT", px, { x: 0.5, y: 0.5 })?.id).toBe(b.id);
     expect(pickLayer([a, b], "BODY_BACK", px, { x: 0.5, y: 0.5 })).toBeUndefined();
   });

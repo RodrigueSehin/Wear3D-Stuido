@@ -3,7 +3,7 @@
  * (CDC §3) ; il sera repris dans Supabase à l'inscription (phase 3).
  */
 import { parseDesignDocument, type DesignDocument } from "@wear3d/design-schema";
-import { createStore, del, get, keys, set } from "idb-keyval";
+import { createStore, del, get, keys, set, values } from "idb-keyval";
 
 const designs = () => createStore("wear3d-studio", "designs");
 const assets = () => createStore("wear3d-assets", "assets");
@@ -49,4 +49,9 @@ export async function saveAsset(asset: StoredAsset): Promise<void> {
 
 export async function loadAsset(id: string): Promise<StoredAsset | undefined> {
   return get<StoredAsset>(id, assets());
+}
+
+/** Logos et images importés localement (bibliothèque « Logos »). */
+export async function listAssets(): Promise<StoredAsset[]> {
+  return values<StoredAsset>(assets());
 }

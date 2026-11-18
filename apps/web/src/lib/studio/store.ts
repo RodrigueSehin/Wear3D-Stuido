@@ -3,14 +3,23 @@
  * Le document de design est immuable : chaque modification produit un nouvel objet,
  * l'ancien est poussé dans l'historique (gestes continus regroupés).
  */
-import type { DesignDocument, Layer, MaterialCode } from "@wear3d/design-schema";
+import type { DesignDocument, Layer, MaterialCode, Pattern } from "@wear3d/design-schema";
 import { SnapshotHistory } from "@wear3d/editor-2d";
-import type { GarmentDefinition, LightingPreset } from "@wear3d/garment-engine";
+import type { GarmentDefinition, LightingPreset, ViewPreset } from "@wear3d/garment-engine";
 import { create } from "zustand";
 
-export type ToolId = "model" | "colors" | "materials" | "texts" | "images" | "numbers" | "ai";
-export type StudioMode = "design" | "simulation";
+/** Entrées du rail gauche (maquette Studio). */
+export type RailItem =
+  "design" | "textures" | "logos" | "texts" | "elements" | "mockups" | "scenes" | "settings";
+export type LibraryTab = "models" | "colors" | "patterns" | "fabrics";
+export type ViewerTool = "select" | "move" | "pan" | "orbit";
 export type SaveState = "idle" | "saving" | "saved" | "offline" | "error";
+
+/**
+ * Sélection de l'inspecteur : un calque, la couleur de base (zones) ou le motif graphique.
+ */
+export type Selection =
+  { kind: "layer"; id: string } | { kind: "base" } | { kind: "pattern" } | null;
 
 const history = new SnapshotHistory<DesignDocument>();
 
@@ -22,14 +31,24 @@ interface StudioState {
   /** Incrémenté à chaque modification du document (déclenche l'autosave). */
   revision: number;
 
+  selection: Selection;
   selectedZone: string | null;
-  selectedLayerId: string | null;
   hoveredZone: string | null;
-  tool: ToolId | null;
-  mode: StudioMode;
+  rail: RailItem;
+  libraryOpen: boolean;
+  libraryTab: LibraryTab;
+  inspectorOpen: boolean;
+  viewMode: "3d" | "2d";
+  tool: ViewerTool;
+  preview: boolean;
   lighting: LightingPreset;
+  showPodium: boolean;
+  dragging: boolean;
+  /** Vue la plus proche de la caméra (miniatures, barre « Vue »). */
+  activeView: ViewPreset;
   recentColors: string[];
   saveState: SaveState;
+  lastSavedAt: Date | null;
   canUndo: boolean;
   canRedo: boolean;
 
@@ -47,25 +66,50 @@ interface StudioState {
   redo(): void;
 
   setZoneColor(zone: string, color: string, coalesceKey?: string): void;
-  setZonesColor(zones: string[], color: string): void;
+  setZonesColor(zones: readonly string[], color: string): void;
   setZoneMaterial(zone: string, material: MaterialCode): void;
+  setZonesMaterial(zones: readonly string[], material: MaterialCode): void;
+  setZonesPattern(
+    zones: readonly string[],
+    pattern: Pattern | undefined,
+    coalesceKey?: string,
+  ): void;
   addLayer(layer: Layer): void;
   updateLayer(id: string, patch: (layer: Layer) => Layer, coalesceKey?: string): void;
   removeLayer(id: string): void;
   duplicateLayer(id: string): void;
   reorderLayer(id: string, direction: "up" | "down"): void;
+  /** Place le calque à l'index donné (0 = tout en dessous). */
+  moveLayerTo(id: string, index: number): void;
 
+  select(selection: Selection): void;
   selectZone(zone: string | null): void;
-  selectLayer(id: string | null): void;
   setHoveredZone(zone: string | null): void;
-  setTool(tool: ToolId | null): void;
-  setMode(mode: StudioMode): void;
+  openRail(item: RailItem): void;
+  setLibraryOpen(open: boolean): void;
+  setLibraryTab(tab: LibraryTab): void;
+  setInspectorOpen(open: boolean): void;
+  setViewMode(mode: "3d" | "2d"): void;
+  setTool(tool: ViewerTool): void;
+  setPreview(preview: boolean): void;
   setLighting(lighting: LightingPreset): void;
+  setShowPodium(show: boolean): void;
+  setDragging(dragging: boolean): void;
+  setActiveView(view: ViewPreset): void;
   pushRecentColor(color: string): void;
   setSaveState(state: SaveState): void;
 }
 
 const flags = () => ({ canUndo: history.canUndo, canRedo: history.canRedo });
+
+/** Zones portant un motif (pour le calque « Motif graphique »). */
+export function patternZones(doc: DesignDocument | null): string[] {
+  return doc
+    ? Object.entries(doc.zones)
+        .filter(([, z]) => z.pattern)
+        .map(([code]) => code)
+    : [];
+}
 
 export const useStudio = create<StudioState>()((set, get) => ({
   designId: null,
@@ -73,14 +117,23 @@ export const useStudio = create<StudioState>()((set, get) => ({
   definition: null,
   doc: null,
   revision: 0,
+  selection: null,
   selectedZone: null,
-  selectedLayerId: null,
   hoveredZone: null,
-  tool: "colors",
-  mode: "design",
+  rail: "design",
+  libraryOpen: true,
+  libraryTab: "models",
+  inspectorOpen: true,
+  viewMode: "3d",
+  tool: "select",
+  preview: false,
   lighting: "studio",
-  recentColors: ["#14243B", "#FFFFFF", "#1F5EFF", "#111827", "#6A3CF0", "#E5484D", "#F5B70A"],
+  showPodium: true,
+  dragging: false,
+  activeView: "front",
+  recentColors: ["#1D4ED8", "#FFFFFF", "#0B1530", "#DC2626", "#16A34A", "#F5B70A", "#7C3AED"],
   saveState: "idle",
+  lastSavedAt: null,
   canUndo: false,
   canRedo: false,
 
@@ -92,9 +145,10 @@ export const useStudio = create<StudioState>()((set, get) => ({
       definition,
       doc,
       revision: 0,
+      selection: null,
       selectedZone: definition.zones[0]?.code ?? null,
-      selectedLayerId: null,
       saveState: "saved",
+      lastSavedAt: new Date(),
       ...flags(),
     });
   },
@@ -154,18 +208,47 @@ export const useStudio = create<StudioState>()((set, get) => ({
   },
 
   setZoneMaterial(zone, material) {
+    get().setZonesMaterial([zone], material);
+  },
+
+  setZonesMaterial(zones, material) {
     get().seal();
     get().update((doc) => {
-      const style = doc.zones[zone];
-      if (!style || style.material === material) return doc;
-      return { ...doc, zones: { ...doc.zones, [zone]: { ...style, material } } };
+      const next = { ...doc.zones };
+      let changed = false;
+      for (const z of zones) {
+        if (next[z] && next[z].material !== material) {
+          next[z] = { ...next[z], material };
+          changed = true;
+        }
+      }
+      return changed ? { ...doc, zones: next } : doc;
     });
+    get().seal();
+  },
+
+  setZonesPattern(zones, pattern, coalesceKey) {
+    if (!coalesceKey) get().seal();
+    get().update((doc) => {
+      const next = { ...doc.zones };
+      for (const z of zones) {
+        const style = next[z];
+        if (!style) continue;
+        if (pattern) next[z] = { ...style, pattern };
+        else {
+          const { pattern: _removed, ...rest } = style;
+          next[z] = rest;
+        }
+      }
+      return { ...doc, zones: next };
+    }, coalesceKey);
+    if (!coalesceKey) get().seal();
   },
 
   addLayer(layer) {
     get().seal();
     get().update((doc) => ({ ...doc, layers: [...doc.layers, layer] }));
-    set({ selectedLayerId: layer.id, selectedZone: layer.zone });
+    set({ selection: { kind: "layer", id: layer.id }, selectedZone: layer.zone });
   },
 
   updateLayer(id, patch, coalesceKey) {
@@ -178,7 +261,8 @@ export const useStudio = create<StudioState>()((set, get) => ({
   removeLayer(id) {
     get().seal();
     get().update((doc) => ({ ...doc, layers: doc.layers.filter((l) => l.id !== id) }));
-    if (get().selectedLayerId === id) set({ selectedLayerId: null });
+    const sel = get().selection;
+    if (sel?.kind === "layer" && sel.id === id) set({ selection: null });
   },
 
   duplicateLayer(id) {
@@ -193,54 +277,108 @@ export const useStudio = create<StudioState>()((set, get) => ({
   },
 
   reorderLayer(id, direction) {
+    const layers = get().doc?.layers ?? [];
+    const i = layers.findIndex((l) => l.id === id);
+    if (i < 0) return;
+    get().moveLayerTo(id, direction === "up" ? i + 1 : i - 1);
+  },
+
+  moveLayerTo(id, index) {
     get().seal();
     get().update((doc) => {
-      const i = doc.layers.findIndex((l) => l.id === id);
-      const j = direction === "up" ? i + 1 : i - 1;
-      if (i < 0 || j < 0 || j >= doc.layers.length) return doc;
+      const from = doc.layers.findIndex((l) => l.id === id);
+      const to = Math.max(0, Math.min(doc.layers.length - 1, index));
+      if (from < 0 || from === to) return doc;
       const layers = [...doc.layers];
-      [layers[i], layers[j]] = [layers[j]!, layers[i]!];
+      const [moved] = layers.splice(from, 1);
+      layers.splice(to, 0, moved!);
       return { ...doc, layers };
     });
   },
 
+  select(selection) {
+    history.seal();
+    const layer =
+      selection?.kind === "layer"
+        ? get().doc?.layers.find((l) => l.id === selection.id)
+        : undefined;
+    set({
+      selection,
+      ...(layer ? { selectedZone: layer.zone } : {}),
+      ...(selection ? { inspectorOpen: true } : {}),
+    });
+  },
   selectZone(zone) {
     history.seal();
     set({ selectedZone: zone });
   },
-  selectLayer(id) {
-    history.seal();
-    const layer = id ? get().doc?.layers.find((l) => l.id === id) : undefined;
-    set({ selectedLayerId: id, ...(layer ? { selectedZone: layer.zone } : {}) });
-  },
   setHoveredZone(zone) {
     if (get().hoveredZone !== zone) set({ hoveredZone: zone });
   },
-  setTool(tool) {
-    set((s) => ({ tool: s.tool === tool ? null : tool }));
+  openRail(item) {
+    set((s) => ({
+      rail: item,
+      libraryOpen: s.rail === item ? !s.libraryOpen : true,
+      ...(item === "design" && s.rail !== "design" ? { libraryTab: "models" as const } : {}),
+      ...(item === "textures" ? { libraryTab: "fabrics" as const } : {}),
+    }));
   },
-  setMode(mode) {
-    set({ mode, hoveredZone: null });
+  setLibraryOpen(libraryOpen) {
+    set({ libraryOpen });
+  },
+  setLibraryTab(libraryTab) {
+    set({ libraryTab });
+  },
+  setInspectorOpen(inspectorOpen) {
+    set({ inspectorOpen });
+  },
+  setViewMode(viewMode) {
+    set({ viewMode });
+  },
+  setTool(tool) {
+    set({ tool });
+  },
+  setPreview(preview) {
+    set({ preview, hoveredZone: null });
   },
   setLighting(lighting) {
     set({ lighting });
+  },
+  setShowPodium(showPodium) {
+    set({ showPodium });
+  },
+  setDragging(dragging) {
+    set({ dragging });
+  },
+  setActiveView(activeView) {
+    if (get().activeView !== activeView) set({ activeView });
   },
   pushRecentColor(color) {
     const c = color.toUpperCase();
     set((s) => ({ recentColors: [c, ...s.recentColors.filter((x) => x !== c)].slice(0, 8) }));
   },
   setSaveState(saveState) {
-    set({ saveState });
+    set(saveState === "saved" ? { saveState, lastSavedAt: new Date() } : { saveState });
   },
 }));
 
 function keepSelection(s: StudioState, doc: DesignDocument) {
-  return s.selectedLayerId && !doc.layers.some((l) => l.id === s.selectedLayerId)
-    ? { selectedLayerId: null }
+  return s.selection?.kind === "layer" &&
+    !doc.layers.some((l) => l.id === (s.selection as { id: string }).id)
+    ? { selection: null }
     : {};
 }
 
 /** Calque sélectionné (sélecteur dérivé). */
 export function useSelectedLayer(): Layer | undefined {
-  return useStudio((s) => s.doc?.layers.find((l) => l.id === s.selectedLayerId));
+  return useStudio((s) =>
+    s.selection?.kind === "layer"
+      ? s.doc?.layers.find((l) => l.id === (s.selection as { id: string }).id)
+      : undefined,
+  );
+}
+
+export function selectedLayerId(): string | null {
+  const sel = useStudio.getState().selection;
+  return sel?.kind === "layer" ? sel.id : null;
 }

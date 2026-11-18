@@ -3,7 +3,8 @@
  * Partagé par le studio, le serveur et les workers.
  */
 export * from "./primitives";
-export * from "./v1";
+export * from "./v2";
+export { designDocumentV1Schema, type DesignDocumentV1 } from "./v1";
 export * from "./migrations";
 export * from "./tokens";
 export * from "./factory";

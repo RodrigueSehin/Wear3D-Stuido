@@ -1,153 +1,212 @@
 "use client";
 
-import type { GarmentViewerHandle } from "@wear3d/garment-engine/react";
-import { Badge, Button, cn } from "@wear3d/ui";
 import {
-  ArrowLeft,
-  Check,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Logo,
+} from "@wear3d/ui";
+import {
+  ChevronDown,
+  CloudAlert,
+  CloudCheck,
   CloudOff,
-  Download,
+  Eye,
+  EyeOff,
+  FileBox,
+  FileImage,
+  FileText,
+  ImageIcon,
   Loader2,
+  Pencil,
   Redo2,
   Share2,
-  TriangleAlert,
   Undo2,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type RefObject } from "react";
+import { useRef, useState } from "react";
 import { useStudio, type SaveState } from "@/lib/studio/store";
+import { captureImage, downloadBlob, slugify, type ExportFormat } from "@/lib/studio/viewer-bridge";
 
-const SAVE_LABEL: Record<SaveState, { label: string; icon: typeof Check; tone: string }> = {
-  idle: { label: "Brouillon", icon: Check, tone: "text-muted-foreground" },
-  saving: { label: "En cours…", icon: Loader2, tone: "text-muted-foreground" },
-  saved: { label: "Sauvegardé", icon: Check, tone: "text-success" },
-  offline: { label: "Hors ligne", icon: CloudOff, tone: "text-warning" },
-  error: { label: "Erreur de sauvegarde", icon: TriangleAlert, tone: "text-danger" },
-};
+const time = (d: Date | null) =>
+  d ? d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
 
-export function TopBar({ viewerRef }: { viewerRef: RefObject<GarmentViewerHandle | null> }) {
+function SaveStatus() {
+  const saveState = useStudio((s) => s.saveState);
+  const lastSavedAt = useStudio((s) => s.lastSavedAt);
+  const map: Record<SaveState, { icon: typeof CloudCheck; label: string; tone: string }> = {
+    idle: { icon: CloudCheck, label: "Brouillon", tone: "text-emerald-400" },
+    saving: { icon: Loader2, label: "Enregistrement…", tone: "text-white/80" },
+    saved: {
+      icon: CloudCheck,
+      label: `Enregistré à ${time(lastSavedAt)}`,
+      tone: "text-emerald-400",
+    },
+    offline: { icon: CloudOff, label: "Hors ligne", tone: "text-amber-400" },
+    error: { icon: CloudAlert, label: "Erreur d'enregistrement", tone: "text-red-400" },
+  };
+  const s = map[saveState];
+  return (
+    <span
+      className="hidden h-10 items-center gap-2 rounded-full bg-white/[0.07] px-4 text-sm text-white/90 lg:inline-flex"
+      aria-live="polite"
+    >
+      <s.icon
+        className={cn("size-5", s.tone, saveState === "saving" && "animate-spin")}
+        aria-hidden
+      />
+      {s.label}
+    </span>
+  );
+}
+
+function DesignName() {
   const name = useStudio((s) => s.name);
   const rename = useStudio((s) => s.rename);
-  const mode = useStudio((s) => s.mode);
-  const setMode = useStudio((s) => s.setMode);
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <label className="hidden h-11 min-w-0 items-center gap-3 rounded-xl border border-white/25 bg-white/[0.04] px-4 text-white focus-within:border-white/60 md:inline-flex">
+      <span className="sr-only">Nom du design</span>
+      <input
+        ref={input}
+        value={name}
+        onChange={(e) => rename(e.target.value)}
+        maxLength={80}
+        className="w-36 min-w-0 bg-transparent text-[17px] font-medium outline-none xl:w-56"
+      />
+      <button type="button" onClick={() => input.current?.select()} aria-label="Renommer">
+        <Pencil className="size-4 text-white/80" aria-hidden />
+      </button>
+    </label>
+  );
+}
+
+const ghost =
+  "inline-flex h-11 items-center gap-2 rounded-xl border border-white/25 px-3 text-[15px] font-medium text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-50 2xl:px-4";
+
+export function TopBar() {
   const canUndo = useStudio((s) => s.canUndo);
   const canRedo = useStudio((s) => s.canRedo);
   const undo = useStudio((s) => s.undo);
   const redo = useStudio((s) => s.redo);
-  const saveState = useStudio((s) => s.saveState);
-  const [exporting, setExporting] = useState(false);
-  const save = SAVE_LABEL[saveState];
+  const preview = useStudio((s) => s.preview);
+  const setPreview = useStudio((s) => s.setPreview);
+  const name = useStudio((s) => s.name);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  async function exportPng() {
-    if (!viewerRef.current) return;
-    setExporting(true);
+  async function run(kind: string, format: ExportFormat, hd = false) {
+    setBusy(kind);
     try {
-      const blob = await viewerRef.current.capture(2048);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${slugify(name) || "wear3d-design"}.png`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const blob = await captureImage(format, hd);
+      downloadBlob(blob, `${slugify(name) || "wear3d-design"}${hd ? "-hd" : ""}.${format}`);
     } finally {
-      setExporting(false);
+      setBusy(null);
     }
   }
 
   return (
-    <header className="border-border bg-surface flex h-14 shrink-0 items-center gap-2 border-b px-2 sm:gap-3 sm:px-4">
-      <Link
-        href="/app"
-        className="hover:bg-surface-muted rounded-md p-2"
-        aria-label="Retour au tableau de bord"
-      >
-        <ArrowLeft className="size-5" aria-hidden />
+    <header className="flex h-[70px] shrink-0 items-center gap-3 bg-gradient-to-r from-[#060d26] via-[#0a1638] to-[#0b1a45] px-4 text-white">
+      <Link href="/app" aria-label="Retour au tableau de bord" className="shrink-0">
+        <Logo inverted className="[&>span:last-child]:text-base [&_svg]:h-9 [&_svg]:w-14" />
       </Link>
-      <input
-        value={name}
-        onChange={(e) => rename(e.target.value)}
-        aria-label="Nom du design"
-        className="hover:border-border focus:border-action w-28 min-w-0 rounded-md border border-transparent bg-transparent px-2 py-1 font-semibold focus:outline-none sm:w-48"
-        maxLength={80}
-      />
-      <Badge variant="outline" className="hidden sm:inline-flex">
-        Brouillon
-      </Badge>
-      <span
-        className={cn("hidden items-center gap-1 text-xs md:inline-flex", save.tone)}
-        aria-live="polite"
-      >
-        <save.icon
-          className={cn("size-3.5", saveState === "saving" && "animate-spin")}
-          aria-hidden
-        />
-        {save.label}
-      </span>
+      <span className="mx-2 hidden h-9 w-px bg-white/20 sm:block" aria-hidden />
+      <h1 className="font-display hidden text-2xl font-bold sm:block">Studio 3D</h1>
+      <span className="ml-3" />
+      <DesignName />
 
-      <div
-        className="bg-surface-muted mx-auto flex rounded-full p-1 text-sm"
-        role="tablist"
-        aria-label="Mode"
-      >
-        {(["design", "simulation"] as const).map((m) => (
+      <div className="ml-auto flex items-center gap-3">
+        <SaveStatus />
+        <div className="flex h-11 items-center rounded-xl bg-white/10 px-1">
           <button
-            key={m}
             type="button"
-            role="tab"
-            aria-selected={mode === m}
-            onClick={() => setMode(m)}
-            className={cn(
-              "rounded-full px-3 py-1 font-medium sm:px-4",
-              mode === m
-                ? "bg-brand-navy-900 text-white"
-                : "text-muted-foreground hover:text-foreground",
-            )}
+            onClick={undo}
+            disabled={!canUndo}
+            aria-label="Annuler (Ctrl+Z)"
+            className="rounded-lg p-2 hover:bg-white/10 disabled:opacity-40"
           >
-            {m === "design" ? "Design" : "Simulation"}
+            <Undo2 className="size-5" aria-hidden />
           </button>
-        ))}
+          <button
+            type="button"
+            onClick={redo}
+            disabled={!canRedo}
+            aria-label="Rétablir (Ctrl+Y)"
+            className="rounded-lg p-2 hover:bg-white/10 disabled:opacity-40"
+          >
+            <Redo2 className="size-5" aria-hidden />
+          </button>
+        </div>
+        <button
+          type="button"
+          className={ghost}
+          onClick={() => setPreview(!preview)}
+          aria-pressed={preview}
+        >
+          {preview ? (
+            <EyeOff className="size-5" aria-hidden />
+          ) : (
+            <Eye className="size-5" aria-hidden />
+          )}
+          <span className="hidden xl:inline">{preview ? "Quitter l'aperçu" : "Aperçu"}</span>
+        </button>
+        <button
+          type="button"
+          className={ghost}
+          onClick={() => run("hd", "png", true)}
+          disabled={busy !== null}
+        >
+          {busy === "hd" ? (
+            <Loader2 className="size-5 animate-spin" aria-hidden />
+          ) : (
+            <ImageIcon className="size-5" aria-hidden />
+          )}
+          <span className="hidden xl:inline">Rendu HD</span>
+        </button>
+        <button
+          type="button"
+          className={cn(ghost, "hidden lg:inline-flex")}
+          disabled
+          title="Partage par lien : phase 5"
+        >
+          <Share2 className="size-5" aria-hidden />
+          <span className="hidden xl:inline">Partager</span>
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              disabled={busy !== null}
+              className="bg-action hover:bg-action-hover inline-flex h-11 items-center gap-2 rounded-xl px-5 text-[15px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-60"
+            >
+              {busy && busy !== "hd" ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : null}
+              Exporter
+              <ChevronDown className="size-4" aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuLabel>Format d&apos;export</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={() => void run("png", "png")}>
+              <FileImage /> Image PNG (fond transparent)
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void run("jpg", "jpg")}>
+              <FileImage /> Image JPG
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled>
+              <FileText /> PDF fiche produit — phase 5
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>
+              <FileBox /> Modèle 3D GLB — V1.1
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={undo}
-        disabled={!canUndo}
-        aria-label="Annuler (Ctrl+Z)"
-      >
-        <Undo2 aria-hidden />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={redo}
-        disabled={!canRedo}
-        aria-label="Rétablir (Ctrl+Y)"
-      >
-        <Redo2 aria-hidden />
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled
-        title="Partage par lien : phase 5"
-        className="hidden lg:inline-flex"
-      >
-        <Share2 aria-hidden /> Partager
-      </Button>
-      <Button size="sm" onClick={exportPng} disabled={exporting}>
-        {exporting ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />}
-        <span className="hidden sm:inline">Exporter</span>
-      </Button>
     </header>
   );
-}
-
-function slugify(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }

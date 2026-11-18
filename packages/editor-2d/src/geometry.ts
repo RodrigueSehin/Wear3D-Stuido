@@ -38,8 +38,8 @@ export function isInsideZone(local: { x: number; y: number }): boolean {
   return local.x >= 0 && local.x <= 1 && local.y >= 0 && local.y <= 1;
 }
 
-/** Taille d'un calque en pixels, avant rotation. `imageAspect` = largeur / hauteur. */
-export function layerSizePx(
+/** Taille naturelle d'un calque (ratio conservé), en pixels, avant rotation. */
+export function naturalSizePx(
   layer: Layer,
   zonePx: PxRect,
   imageAspect: (assetId: string) => number | undefined = () => 1,
@@ -55,6 +55,21 @@ export function layerSizePx(
       return { w, h: w / aspect };
     }
   }
+}
+
+/**
+ * Taille affichée d'un calque : taille naturelle, sauf si une hauteur libre `h`
+ * (ratio déverrouillé) est définie.
+ */
+export function layerSizePx(
+  layer: Layer,
+  zonePx: PxRect,
+  imageAspect?: (assetId: string) => number | undefined,
+): { w: number; h: number } {
+  const natural = naturalSizePx(layer, zonePx, imageAspect);
+  return layer.transform.h !== undefined
+    ? { w: natural.w, h: layer.transform.h * zonePx.h }
+    : natural;
 }
 
 /** Corps du numéro : un numéro à 2 chiffres en police condensée occupe ~la largeur donnée. */

@@ -161,6 +161,22 @@ Dégradés :
 - Forme du T-shirt procédurale (épaules et emmanchures simplifiées) : à remplacer par le modèle Blender définitif.
 - Sélection des polices : 4 polices sur les 30 prévues.
 
+### Phase 1 bis — Interface du studio conforme à la maquette ✅ (18 nov. 2026)
+
+Maquette de référence : `docs/maquette/WEAR3D Studio 3D - Studio work space.png`.
+
+- Barre supérieure navy : nom du design, « Enregistré à HH:MM », annuler/rétablir, Aperçu (rotation automatique), Rendu HD (atlas 4096 px, capture 3840 px), Partager (phase 5), Exporter (PNG transparent, JPG ; PDF et GLB annoncés).
+- Rail gauche : Design, Textures, Logos, Textes, Éléments, Maquettes, Scènes, Paramètres.
+- Bibliothèque : onglets Modèles (8 designs prêts à l'emploi, filtres catégorie/style), Couleurs, Motifs (7 motifs intégrés, placés ou répétés), Tissus (vignettes de maille).
+- Barre d'outils flottante : sélection, déplacer l'élément, panoramique, rotation, zoom, plein écran.
+- Scène : podium lumineux, bascule 3D/2D (vue à plat éditable), miniatures de vues, curseur 360°.
+- Barre du bas : Vue (Face, Dos, Gauche, Droite), Couleurs rapides, Tissu.
+- Calques : glisser-déposer, visibilité, menu d'actions, calques « Motif graphique » et « Couleur de base ».
+- Inspecteur : Transformation (X, Y, W, H en px d'export, ratio lié, rotation, symétries), Apparence (opacité, mode de fusion), Effets (ombre portée, contour, lueur), Couleur.
+- **Format de document v2** (CDC §5.4) : hauteur libre, symétries, mode de fusion, effets, couleur de motif ; migration automatique v1 → v2 testée.
+
+Entre 1280 et 1536 px de large, Calques et Inspecteur s'empilent dans la colonne de droite.
+
 ### Phase 2 — Studio complet
 
 Interface §2.4 (barre supérieure, rail, panneaux, inspecteur à onglets, vues miniatures, bascule Design/Simulation), undo/redo 100 actions, raccourcis, calques et groupes, motifs, 30 polices, numéros sportifs, alerte < 150 dpi, environnements d'éclairage, états (WebGL absent, hors ligne, conflit), ajout du maillot de football et du hoodie.

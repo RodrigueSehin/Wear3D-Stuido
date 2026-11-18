@@ -8,3 +8,4 @@ export * from "./conventions";
 export * from "./catalog";
 export * from "./materials";
 export * from "./presets";
+export * from "./weave";

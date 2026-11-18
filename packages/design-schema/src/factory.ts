@@ -1,5 +1,13 @@
 import type { DesignDocument } from "./migrations";
-import type { ImageLayer, Layer, MaterialCode, NumberLayer, TextLayer } from "./v1";
+import {
+  DEFAULT_EFFECTS,
+  type ImageLayer,
+  type Layer,
+  type MaterialCode,
+  type NumberLayer,
+  type TextLayer,
+  type Transform,
+} from "./v2";
 
 export interface GarmentZoneDefaults {
   code: string;
@@ -14,7 +22,7 @@ export function createEmptyDocument(
   size = "M",
 ): DesignDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     model: { versionId, size, morph: "posed" },
     zones: Object.fromEntries(zones.map((z) => [z.code, { color: z.color, material: z.material }])),
     layers: [],
@@ -29,15 +37,30 @@ export function newLayerId(): string {
   return `el_${Date.now().toString(36)}${counter.toString(36)}${rand}`;
 }
 
+const transform = (x: number, y: number, w: number): Transform => ({
+  x,
+  y,
+  w,
+  rotation: 0,
+  flipX: false,
+  flipY: false,
+});
+
+const base = (zone: string) => ({
+  id: newLayerId(),
+  zone,
+  locked: false,
+  visible: true,
+  opacity: 1,
+  blendMode: "normal" as const,
+  effects: structuredClone(DEFAULT_EFFECTS),
+});
+
 export function createTextLayer(zone: string, value = "TEXTE"): TextLayer {
   return {
-    id: newLayerId(),
+    ...base(zone),
     type: "text",
-    zone,
-    locked: false,
-    visible: true,
-    opacity: 1,
-    transform: { x: 0.5, y: 0.3, w: 0.5, rotation: 0 },
+    transform: transform(0.5, 0.3, 0.5),
     text: {
       value,
       font: "anton",
@@ -52,33 +75,25 @@ export function createTextLayer(zone: string, value = "TEXTE"): TextLayer {
 
 export function createNumberLayer(zone: string, value = "10"): NumberLayer {
   return {
-    id: newLayerId(),
+    ...base(zone),
     type: "number",
-    zone,
-    locked: false,
-    visible: true,
-    opacity: 1,
-    transform: { x: 0.5, y: 0.5, w: 0.4, rotation: 0 },
+    transform: transform(0.5, 0.5, 0.4),
     number: { value, style: "block-classic", color: "#FFFFFF" },
   };
 }
 
 export function createImageLayer(zone: string, assetId: string): ImageLayer {
   return {
-    id: newLayerId(),
+    ...base(zone),
     type: "image",
-    zone,
     assetId,
-    locked: false,
-    visible: true,
-    opacity: 1,
-    transform: { x: 0.7, y: 0.22, w: 0.2, rotation: 0 },
+    transform: transform(0.7, 0.22, 0.2),
   };
 }
 
 export function layerLabel(layer: Layer): string {
   if (layer.name) return layer.name;
   if (layer.type === "text") return layer.text.value || "Texte";
-  if (layer.type === "number") return `N° ${layer.number.value}`;
+  if (layer.type === "number") return `Numéro (${layer.number.value})`;
   return "Image";
 }

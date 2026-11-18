@@ -16,6 +16,16 @@ export interface MaterialPreset {
   normalScale: number;
 }
 
+/** Nom commercial affiché dans le sélecteur « Tissu » (maquette Studio). */
+export const FABRIC_NAMES: Record<MaterialCode, { name: string; subtitle: string }> = {
+  cotton: { name: "Coton Premium", subtitle: "Coton peigné" },
+  polyester: { name: "Classic", subtitle: "Polyester" },
+  "poly-sport": { name: "Sport Pro", subtitle: "Polyester respirant" },
+  elastane: { name: "Stretch Fit", subtitle: "Élasthanne" },
+  "sport-mesh": { name: "Air Mesh", subtitle: "Maille sportive" },
+  technical: { name: "Tech Pro", subtitle: "Tissu technique" },
+};
+
 export const MATERIAL_PRESETS: Record<MaterialCode, MaterialPreset> = {
   cotton: {
     code: "cotton",
