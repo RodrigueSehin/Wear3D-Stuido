@@ -136,14 +136,30 @@ Dégradés :
 - CI GitHub Actions : install, lint, typecheck, test, build.
 - **Démo** : `pnpm dev` affiche la page d'accueil squelette aux couleurs des maquettes ; `pnpm lint typecheck test build` passent.
 
-### Phase 1 — Prototype moteur sur T-shirt (go / no-go)
+### Phase 1 — Prototype moteur sur T-shirt (go / no-go) ✅ livrée (18 nov. 2026) — en attente de votre décision
 
-- `design-schema` : schéma Zod v1 (CDC §5.4), jetons `{player.*}`, registre de migrations, tests.
-- T-shirt GLB procédural conforme aux conventions (zones `Zone_*`, une île UV par zone).
-- `garment-engine` : chargement GLB (Meshopt/KTX2), zones par nom de mesh, `MeshPhysicalMaterial` + sheen, couleur et matière par zone, `frameloop="demand"`, vues prédéfinies.
-- `editor-2d` : composition Konva par zone dans un atlas UV 2048 px (`CanvasTexture`), logo et texte placés par raycast UV.
-- Sauvegarde locale du document (IndexedDB), export PNG côté client.
-- **Go / no-go** : logo net sans déformation, 60 i/s, silhouette en moins de 1,5 s.
+- `design-schema` : schéma Zod v1 (CDC §5.4), jetons `{player.*}`, registre de migrations, fabriques de calques, tests.
+- T-shirt GLB procédural conforme aux conventions : 5 zones `Zone_*`, une île UV par zone, **UV isotropes** (testé), 16 256 triangles, 368 Ko (`pnpm --filter @wear3d/garment-engine generate`).
+- `garment-engine` : viewer R3F (`/react`), zones par nom de mesh, `MeshPhysicalMaterial` + sheen + normal map de maille procédurale par matière, 3 éclairages sans HDR externe, `frameloop="demand"`, 5 vues prédéfinies, capture PNG.
+- `editor-2d` : composition de l'atlas UV 2048 px (Canvas 2D natif), géométrie et sélection des calques, historique par instantanés avec regroupement des gestes.
+- Studio `/studio/[id]` : rail d'outils, panneaux (modèle, couleurs, matières, textes, images, numéros), inspecteur (propriétés, calques), Design/Simulation, glisser des calques sur la surface 3D, raccourcis, alerte < 150 dpi, import PNG/JPG/SVG contrôlé (signature binaire, SVG nettoyé), autosave IndexedDB (800 ms), export PNG 2048 px transparent.
+
+**Résultats mesurés (navigateur réel, build de production)**
+
+| Critère go / no-go                                | Résultat                                                                                                     |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Logo net et non déformé                           | ✅ SVG rastérisé à 2048 px, aucune déformation en vue avant et 3/4                                           |
+| 60 i/s en rotation                                | ✅ 60 i/s (ordinateur de développement, 4 calques)                                                           |
+| Silhouette < 1,5 s                                | ⚠️ non mesuré formellement ; GLB de 368 Ko, viewport chargé à la demande (161 Ko de JS au premier affichage) |
+| Position conservée après rechargement (REC-06/08) | ✅                                                                                                           |
+| Annuler / rétablir                                | ✅ (gestes continus regroupés)                                                                               |
+
+**Écarts assumés par rapport au CDC, à reprendre plus tard**
+
+- Composition de l'atlas en Canvas 2D natif plutôt que Konva : même rendu en studio et en export ; Konva reste prévu pour la vue 2D à plat (phase 2).
+- GLB non compressé (pas encore Meshopt/KTX2) : à ajouter au pipeline `gltf-transform` avec les vrais modèles.
+- Forme du T-shirt procédurale (épaules et emmanchures simplifiées) : à remplacer par le modèle Blender définitif.
+- Sélection des polices : 4 polices sur les 30 prévues.
 
 ### Phase 2 — Studio complet
 

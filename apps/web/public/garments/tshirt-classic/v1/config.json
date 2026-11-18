@@ -1,0 +1,104 @@
+{
+  "reference": "TS-CLASSIC",
+  "versionId": "tshirt-classic@1",
+  "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
+  "materials": ["cotton", "polyester", "poly-sport", "elastane", "sport-mesh", "technical"],
+  "zones": [
+    {
+      "code": "BODY_FRONT",
+      "meshName": "Zone_Body_Front",
+      "label": "Devant",
+      "uvRect": {
+        "x": 0.0078125,
+        "y": 0.0078125,
+        "w": 0.48828125,
+        "h": 0.62
+      },
+      "printAreaMm": {
+        "w": 300,
+        "h": 400
+      },
+      "allows": ["color", "material", "pattern", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    },
+    {
+      "code": "BODY_BACK",
+      "meshName": "Zone_Body_Back",
+      "label": "Dos",
+      "uvRect": {
+        "x": 0.50390625,
+        "y": 0.0078125,
+        "w": 0.48828125,
+        "h": 0.62
+      },
+      "printAreaMm": {
+        "w": 300,
+        "h": 450
+      },
+      "allows": ["color", "material", "pattern", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    },
+    {
+      "code": "SLEEVE_LEFT",
+      "meshName": "Zone_Sleeve_Left",
+      "label": "Manche gauche",
+      "uvRect": {
+        "x": 0.0078125,
+        "y": 0.635625,
+        "w": 0.48828125,
+        "h": 0.2
+      },
+      "printAreaMm": {
+        "w": 100,
+        "h": 100
+      },
+      "allows": ["color", "material", "pattern", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    },
+    {
+      "code": "SLEEVE_RIGHT",
+      "meshName": "Zone_Sleeve_Right",
+      "label": "Manche droite",
+      "uvRect": {
+        "x": 0.50390625,
+        "y": 0.635625,
+        "w": 0.48828125,
+        "h": 0.2
+      },
+      "printAreaMm": {
+        "w": 100,
+        "h": 100
+      },
+      "allows": ["color", "material", "pattern", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    },
+    {
+      "code": "COLLAR",
+      "meshName": "Zone_Collar",
+      "label": "Col",
+      "uvRect": {
+        "x": 0.0078125,
+        "y": 0.8434375,
+        "w": 0.984375,
+        "h": 0.06
+      },
+      "allows": ["color", "material"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    }
+  ]
+}

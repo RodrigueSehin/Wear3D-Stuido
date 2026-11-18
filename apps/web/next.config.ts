@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
     "@wear3d/billing",
     "@wear3d/db",
     "@wear3d/design-schema",
+    "@wear3d/editor-2d",
     "@wear3d/garment-engine",
   ],
   images: {
