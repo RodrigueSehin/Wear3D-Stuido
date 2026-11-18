@@ -16,7 +16,7 @@ SaaS web de conception de vêtements personnalisés en 3D à 360°.
 
 ```bash
 pnpm install
-cp .env.example apps/web/.env.local   # renseigner l'URL et la clé publique Supabase
+cp .env.example .env                  # renseigner l'URL et la clé publique Supabase
 pnpm dev                               # http://localhost:3000
 ```
 

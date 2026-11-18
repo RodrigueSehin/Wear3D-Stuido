@@ -1,5 +1,10 @@
+import { loadEnvConfig } from "@next/env";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { resolve } from "node:path";
+
+// Le .env unique vit à la racine du monorepo (apps/web est le cwd de Next).
+loadEnvConfig(resolve(process.cwd(), "../.."));
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
