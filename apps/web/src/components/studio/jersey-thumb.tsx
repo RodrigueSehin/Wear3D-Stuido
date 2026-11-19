@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useEffect, useId, useState } from "react";
 import { patternPreview } from "@/lib/studio/patterns";
 
 /** Vignette de maillot (vue de face) aux couleurs d'un design : corps, manches, col, motif. */
@@ -18,10 +18,15 @@ export function JerseyThumb({
   className?: string;
 }) {
   const id = useId().replace(/:/g, "");
-  const patternUrl = useMemo(
-    () => (pattern ? patternPreview(pattern.assetId, pattern.color, "rgba(0,0,0,0)") : null),
-    [pattern],
-  );
+  // Le motif est dessiné dans un canvas : uniquement dans le navigateur (jamais au rendu serveur).
+  const [patternUrl, setPatternUrl] = useState<string | null>(null);
+  const assetId = pattern?.assetId;
+  const patternColor = pattern?.color;
+  useEffect(() => {
+    setPatternUrl(
+      assetId && patternColor ? patternPreview(assetId, patternColor, "rgba(0,0,0,0)") : null,
+    );
+  }, [assetId, patternColor]);
   const torso = "M30 17 L41 11 Q50 17 59 11 L70 17 L72 40 L72 89 Q50 94 28 89 L28 40 Z";
   return (
     <svg viewBox="0 0 100 100" className={className} aria-hidden>

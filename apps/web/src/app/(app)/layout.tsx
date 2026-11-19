@@ -1,5 +1,7 @@
 import { Bell, CircleHelp, LogOut, Search } from "lucide-react";
 import { isSupabaseConfigured } from "@/env";
+import { PLAN_CARDS } from "@wear3d/billing";
+import type { CloudClient } from "@/lib/studio/cloud";
 import { signOut } from "@/lib/auth/actions";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app/app-sidebar";
@@ -7,6 +9,19 @@ import { AppSidebar } from "@/components/app/app-sidebar";
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   const supabase = isSupabaseConfigured ? await createClient() : null;
   const user = supabase ? (await supabase.auth.getUser()).data.user : null;
+  // Offre active (Free par défaut) pour le menu utilisateur.
+  let planName = "Free";
+  if (supabase && user) {
+    const { data: sub } = await (supabase as unknown as CloudClient)
+      .from("subscriptions")
+      .select("plan_code")
+      .in("status", ["active", "trialing"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const code = (sub as { plan_code?: string } | null)?.plan_code;
+    planName = PLAN_CARDS.find((c) => c.id === code)?.name ?? planName;
+  }
   const name =
     (user?.user_metadata?.first_name as string | undefined) ?? user?.email?.split("@")[0] ?? null;
   return (
@@ -47,6 +62,10 @@ export default async function ClientLayout({ children }: { children: React.React
                 title={user.email ?? undefined}
               >
                 {name?.[0] ?? "?"}
+              </span>
+              <span className="hidden text-left leading-tight sm:block">
+                <span className="block text-sm font-semibold">{name}</span>
+                <span className="text-muted-foreground block text-xs">Compte {planName}</span>
               </span>
               <button
                 type="submit"
