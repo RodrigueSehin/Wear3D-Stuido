@@ -1,5 +1,5 @@
 import { createEmptyDocument, createImageLayer, createTextLayer } from "@wear3d/design-schema";
-import { TSHIRT_CLASSIC } from "@wear3d/garment-engine";
+import { HOODIE_CLASSIC, TSHIRT_CLASSIC } from "@wear3d/garment-engine";
 import { beforeEach, describe, expect, it } from "vitest";
 import { endDrag, moveLayerToZone, surfaceDown, surfaceMove } from "./interaction";
 import { MOCKUPS, newMockup, withMockup } from "./mockups";
@@ -82,5 +82,21 @@ describe("bords de manche", () => {
     const royal = MOCKUPS.find((m) => m.id === "royal")!;
     const doc = withMockup(useStudio.getState().doc!, TSHIRT_CLASSIC, newMockup(royal));
     expect(doc.trims?.cuffs).toMatchObject({ enabled: true, color: royal.colors[2] });
+  });
+});
+
+describe("changer de vêtement", () => {
+  beforeEach(init);
+
+  it("garde les calques, met à jour la version du modèle, annulable", () => {
+    useStudio.getState().addLayer(createTextLayer("BODY_BACK", "DOS"));
+    useStudio.getState().changeModel(HOODIE_CLASSIC);
+    const s = useStudio.getState();
+    expect(s.definition?.reference).toBe("HD-CLASSIC");
+    expect(s.doc!.model.versionId).toBe(HOODIE_CLASSIC.versionId);
+    expect(s.doc!.layers).toHaveLength(1);
+    s.undo();
+    expect(useStudio.getState().doc!.model.versionId).toBe(TSHIRT_CLASSIC.versionId);
+    expect(useStudio.getState().definition?.reference).toBe("TS-CLASSIC");
   });
 });

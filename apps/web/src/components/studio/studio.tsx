@@ -18,6 +18,7 @@ import { LeftPanel } from "./left-panel";
 import { LeftRail } from "./left-rail";
 import { applyDefaultView } from "./settings-panel";
 import { Stage } from "./stage";
+import { StatusBanner } from "./status-banner";
 import { TopBar } from "./top-bar";
 
 /** Délai d'autosave : bien en dessous des 5 s exigées (CDC F-16, REC-08). */
@@ -100,7 +101,7 @@ export function Studio({
     let timer: ReturnType<typeof setTimeout> | undefined;
     const flush = async () => {
       const s = useStudio.getState();
-      if (!s.designId || !s.doc) return;
+      if (!s.designId || !s.doc || s.conflict) return;
       try {
         await saveDesign({
           id: s.designId,
@@ -215,6 +216,7 @@ export function Studio({
         <>
           <AtlasComposer />
           <TopBar />
+          <StatusBanner />
           <div className="flex min-h-0 flex-1">
             {!preview && <LeftRail />}
             <main

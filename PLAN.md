@@ -3,7 +3,7 @@
 Référence : `docs/Cahier des charges — WEAR3D STUDIO.md` (CDC) et maquettes `docs/maquette/*.png`, `docs/WEAR3D Studio 3D Design Suite.png`.
 En cas de conflit, **les maquettes font foi pour l'apparence**, **le CDC fait foi pour le fonctionnel et la technique**. Les écarts sont listés en section 3.
 
-Dernière mise à jour : 17 nov. 2026.
+Dernière mise à jour : 19 nov. 2026.
 
 ---
 
@@ -177,9 +177,23 @@ Maquette de référence : `docs/maquette/WEAR3D Studio 3D - Studio work space.pn
 
 Entre 1280 et 1536 px de large, Calques et Inspecteur s'empilent dans la colonne de droite.
 
-### Phase 2 — Studio complet
+### Phase 2 — Studio complet ✅ livrée (19 nov. 2026)
 
-Interface §2.4 (barre supérieure, rail, panneaux, inspecteur à onglets, vues miniatures, bascule Design/Simulation), undo/redo 100 actions, raccourcis, calques et groupes, motifs, 30 polices, numéros sportifs, alerte < 150 dpi, environnements d'éclairage, états (WebGL absent, hors ligne, conflit), ajout du maillot de football et du hoodie.
+**Livré**
+
+- Interface §2.4 : barre supérieure, rail, panneaux refondus (Textures, Logos, Textes, Éléments, Maquettes, Scènes, Paramètres), inspecteur, vues miniatures, bascule Design / Simulation.
+- **Trois vues** : 3D, 2D à plat (glisser-déposer, déplacement d'un élément entre zones) et **Patron** (pièces, règles mm/cm/po, endroit/envers, plan de coupe, marges & assemblage, tailles & gradation, inspecteur de pièce, export PDF / PLT / SVG).
+- Undo/redo (limite d'historique), raccourcis, calques et **groupes de calques** (regrouper, masquer, verrouiller, renommer, dupliquer, dissoudre, supprimer ; format de document étendu, rétro-compatible), motifs, numéros sportifs, alerte < 150 dpi, **bords de manche** réglables (couleur, hauteur, rayures) quand le modèle en a.
+- **Contenus** : 23 maquettes, 21 logos, environ 50 éléments, 30 polices.
+- **Trois vêtements** : T-shirt col rond, maillot de football (col en V), hoodie (manches longues, capuche). Changement de modèle depuis Paramètres en gardant les calques (annulable). Vue 2D et Patron adaptés à chaque vêtement (encolure, manches, capuche, dimensions).
+- **Environnements d'éclairage** : Studio, Extérieur, Vitrine, Coucher de soleil, Boutique, Nuit (liés aux scènes).
+- **États dégradés** : WebGL absent, hors ligne (reprise de l'enregistrement au retour du réseau), échec d'enregistrement avec « Réessayer », conflit entre onglets (autosave en pause, choix de la version).
+
+**Reste à faire (reporté, non bloquant pour la Phase 3)**
+
+- Formes 3D définitives : le maillot et le hoodie sont des modèles procéduraux (la capuche ressemble à un col roulé) ; les pièces du patron sont des gabarits par famille, pas des patrons de fabrication validés. Dépend de la décision « source des 3 modèles 3D » (§6).
+- Liste de tissus propre au hoodie, vérification visuelle du maillot en 2D / Patron, états d'erreur testés seulement en conditions réelles pour le conflit.
+- Mesure formelle du temps d'affichage de la silhouette (< 1,5 s).
 
 ### Phase 3 — Données, authentification, sauvegarde
 

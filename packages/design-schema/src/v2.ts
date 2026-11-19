@@ -111,6 +111,8 @@ const layerBase = {
   id: z.string().min(1),
   zone: zoneCodeSchema,
   name: z.string().max(80).optional(),
+  /** Groupe auquel appartient le calque (clé de `groups`). */
+  group: z.string().min(1).max(64).optional(),
   locked: z.boolean().default(false),
   visible: z.boolean().default(true),
   opacity: z.number().min(0).max(1).default(1),
@@ -274,6 +276,8 @@ export const designDocumentV2Schema = z.object({
   }),
   zones: z.record(zoneCodeSchema, zoneStyleSchema),
   layers: z.array(layerSchema).max(200),
+  /** Groupes de calques (nom affiché) ; la visibilité et le verrou se répercutent sur les membres. */
+  groups: z.record(z.string(), z.object({ name: z.string().min(1).max(60) })).optional(),
   scene: sceneSchema.optional(),
   mockup: mockupSchema.optional(),
   sewing: sewingSchema.optional(),

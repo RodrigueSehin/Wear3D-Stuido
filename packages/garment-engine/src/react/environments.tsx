@@ -77,6 +77,93 @@ export function LightingEnvironment({ preset }: { preset: LightingPreset }) {
           />
         </>
       )}
+      {preset === "sunset" && (
+        <>
+          <color attach="background" args={["#f2b27a"]} />
+          <Lightformer
+            form="circle"
+            intensity={5}
+            color="#ffb067"
+            position={[-4, 1.2, 2.5]}
+            scale={2.2}
+            target={[0, 0, 0]}
+          />
+          <Lightformer
+            form="rect"
+            intensity={0.9}
+            color="#7e8fd6"
+            position={[3, 3, -2]}
+            scale={[6, 4, 1]}
+            target={[0, 0, 0]}
+          />
+          <Lightformer
+            form="rect"
+            intensity={0.5}
+            color="#d98a55"
+            position={[0, -3, 0]}
+            scale={[12, 12, 1]}
+            rotation-x={-Math.PI / 2}
+          />
+        </>
+      )}
+      {preset === "boutique" && (
+        <>
+          <color attach="background" args={["#efe6da"]} />
+          <Lightformer
+            form="rect"
+            intensity={1.8}
+            color="#fff1de"
+            position={[0, 4, 2]}
+            scale={[8, 3, 1]}
+            rotation-x={Math.PI / 3}
+          />
+          <Lightformer
+            form="rect"
+            intensity={1}
+            color="#ffe3c2"
+            position={[-3, 1, 2]}
+            scale={[2, 3, 1]}
+            target={[0, 0, 0]}
+          />
+          <Lightformer
+            form="rect"
+            intensity={0.7}
+            color="#fff8ef"
+            position={[3, 1, 1]}
+            scale={[2, 3, 1]}
+            target={[0, 0, 0]}
+          />
+        </>
+      )}
+      {preset === "night" && (
+        <>
+          <color attach="background" args={["#05070f"]} />
+          <Lightformer
+            form="rect"
+            intensity={2.4}
+            color="#3b82f6"
+            position={[-3, 1, 2]}
+            scale={[1, 4, 1]}
+            target={[0, 0, 0]}
+          />
+          <Lightformer
+            form="rect"
+            intensity={2.4}
+            color="#ec4899"
+            position={[3, 1, -1]}
+            scale={[1, 4, 1]}
+            target={[0, 0, 0]}
+          />
+          <Lightformer
+            form="circle"
+            intensity={1.2}
+            color="#c7d2fe"
+            position={[0, 4, 1]}
+            scale={2}
+            rotation-x={Math.PI / 2}
+          />
+        </>
+      )}
       {preset === "showroom" && (
         <>
           <color attach="background" args={["#0a1226"]} />

@@ -178,7 +178,7 @@ export const SCENES: readonly SceneDef[] = [
     id: "locker-room",
     label: "Vestiaire",
     categories: ["sport", "lifestyle"],
-    environment: "studio",
+    environment: "boutique",
     ambiance: "evening",
     draw(ctx, w, h) {
       ctx.fillStyle = "#2a1a10";
@@ -222,7 +222,7 @@ export const SCENES: readonly SceneDef[] = [
     id: "outdoor",
     label: "Extérieur",
     categories: ["lifestyle"],
-    environment: "outdoor",
+    environment: "sunset",
     ambiance: "day",
     draw(ctx, w, h) {
       ctx.fillStyle = vGradient(ctx, 0, h * 0.7, [
@@ -265,7 +265,7 @@ export const SCENES: readonly SceneDef[] = [
     id: "dark",
     label: "Fond sombre",
     categories: ["studio"],
-    environment: "showroom",
+    environment: "night",
     ambiance: "night",
     draw(ctx, w, h) {
       const g = ctx.createRadialGradient(w / 2, h * 0.45, 0, w / 2, h * 0.45, w * 0.7);

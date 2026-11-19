@@ -7,11 +7,43 @@
  */
 import { TSHIRT_UV } from "../catalog/tshirt-classic";
 import type { UvRect } from "../catalog/types";
+
+/** Silhouette paramétrable : le T-shirt, le maillot et le hoodie partagent la même construction. */
+export interface Shape {
+  hemY: number;
+  shoulderY: number;
+  neckRise: number;
+  /** Largeur du corps (multiplicateur) et profondeur. */
+  width: number;
+  /** Profondeur de l’encolure devant et raideur du creux (1 = rond, 2+ = en V). */
+  neckDip: number;
+  neckSharp: number;
+  sleeveLength: number;
+  sleeveAngleDeg: number;
+  sleeveRadius: [number, number];
+  collarHeight: number;
+  collarFlare: number;
+  uv: Record<string, UvRect>;
+}
+
+export const TSHIRT_SHAPE: Shape = {
+  hemY: -0.36,
+  shoulderY: 0.2,
+  neckRise: 0.075,
+  width: 1,
+  neckDip: 0.055,
+  neckSharp: 4,
+  sleeveLength: 0.23,
+  sleeveAngleDeg: 32,
+  sleeveRadius: [0.098, 0.079],
+  collarHeight: 0.026,
+  collarFlare: 0.08,
+  uv: TSHIRT_UV,
+};
+
+let S: Shape = TSHIRT_SHAPE;
 import { buildGrid, orientOutward, type MeshData, type Vec3 } from "./mesh";
 
-const HEM_Y = -0.36;
-const SHOULDER_Y = 0.2;
-const NECK_RISE = 0.075;
 const TORSO_SPLIT = 0.8; // fraction de v consacrée au torse, le reste à l'épaule
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -23,17 +55,17 @@ function section(v: number): { a: number; b: number; y: number } {
   if (v <= TORSO_SPLIT) {
     const t = v / TORSO_SPLIT;
     return {
-      a: 0.245 + 0.015 * smooth(clamp01((t - 0.3) / 0.5)),
-      b: 0.098 + 0.014 * smooth(clamp01((t - 0.35) / 0.5)),
-      y: lerp(HEM_Y, SHOULDER_Y, t),
+      a: (0.245 + 0.015 * smooth(clamp01((t - 0.3) / 0.5))) * S.width,
+      b: (0.098 + 0.014 * smooth(clamp01((t - 0.35) / 0.5))) * S.width,
+      y: lerp(S.hemY, S.shoulderY, t),
     };
   }
   const t = (v - TORSO_SPLIT) / (1 - TORSO_SPLIT);
   const e = smooth(t);
   return {
-    a: lerp(0.26, 0.088, e),
-    b: lerp(0.112, 0.074, e),
-    y: SHOULDER_Y + NECK_RISE * Math.sin((t * Math.PI) / 2),
+    a: lerp(0.26 * S.width, 0.088, e),
+    b: lerp(0.112 * S.width, 0.074, e),
+    y: S.shoulderY + S.neckRise * Math.sin((t * Math.PI) / 2),
   };
 }
 
@@ -45,7 +77,7 @@ function bodyPoint(v: number, theta: number): Vec3 {
   // Encolure plus basse devant : creux en fin d'épaule, centré sur θ = 0.
   const tTop = clamp01((v - TORSO_SPLIT) / (1 - TORSO_SPLIT));
   const front = Math.max(0, Math.cos(theta));
-  const dip = 0.055 * tTop ** 3 * front ** 4;
+  const dip = S.neckDip * tTop ** 3 * front ** S.neckSharp;
   return [x, y - dip, z];
 }
 
@@ -87,7 +119,7 @@ function bodyPanel(name: string, front: boolean, rows = 64, cols = 48): MeshData
     down.push(down[i - 1]! + dist(grid[i]![mid]!, grid[i - 1]![mid]!));
 
   const maxArc = Math.max(...arc.map((s) => s[cols]! - s[0]!));
-  const fit = fitIsotropic(TSHIRT_UV[front ? "BODY_FRONT" : "BODY_BACK"]!, maxArc, down[rows]!);
+  const fit = fitIsotropic(S.uv[front ? "BODY_FRONT" : "BODY_BACK"]!, maxArc, down[rows]!);
 
   const mesh = buildGrid(
     name,
@@ -101,13 +133,13 @@ function bodyPanel(name: string, front: boolean, rows = 64, cols = 48): MeshData
 }
 
 function sleeve(name: string, side: 1 | -1, rows = 20, cols = 40): MeshData {
-  const length = 0.23;
-  const angle = (-32 * Math.PI) / 180;
+  const length = S.sleeveLength;
+  const angle = (-S.sleeveAngleDeg * Math.PI) / 180;
   const dir: Vec3 = [side * Math.cos(angle), Math.sin(angle), 0];
-  const origin: Vec3 = [side * 0.215, 0.135, 0];
+  const origin: Vec3 = [side * 0.215 * S.width, S.shoulderY - 0.065, 0];
   const up: Vec3 = [-dir[1] * side, dir[0] * side, 0]; // perpendiculaire dans le plan XY
   const fwd: Vec3 = [0, 0, 1];
-  const radius = (t: number) => lerp(0.098, 0.079, t);
+  const radius = (t: number) => lerp(S.sleeveRadius[0], S.sleeveRadius[1], t);
 
   const point = (i: number, j: number): Vec3 => {
     const t = i / rows;
@@ -123,7 +155,7 @@ function sleeve(name: string, side: 1 | -1, rows = 20, cols = 40): MeshData {
   };
 
   const circ = Math.PI * 2 * radius(0);
-  const fit = fitIsotropic(TSHIRT_UV[side === 1 ? "SLEEVE_LEFT" : "SLEEVE_RIGHT"]!, circ, length);
+  const fit = fitIsotropic(S.uv[side === 1 ? "SLEEVE_LEFT" : "SLEEVE_RIGHT"]!, circ, length);
   // Couture sous la manche : décalage d'un demi-tour pour centrer le dessus dans l'île.
   const mesh = buildGrid(
     name,
@@ -144,12 +176,12 @@ function sleeve(name: string, side: 1 | -1, rows = 20, cols = 40): MeshData {
 }
 
 function collar(name: string, rows = 4, cols = 96): MeshData {
-  const height = 0.026;
+  const height = S.collarHeight;
   const point = (i: number, j: number): Vec3 => {
     const theta = Math.PI + (j / cols) * Math.PI * 2; // couture au centre dos
     const base = bodyPoint(1, theta);
     const t = i / rows; // 0 = haut du col
-    const flare = 1 + 0.08 * (1 - t);
+    const flare = 1 + S.collarFlare * (1 - t);
     return [base[0] * flare, base[1] + height * (1 - t), base[2] * flare];
   };
   const ring = Array.from({ length: cols + 1 }, (_, j) => point(rows, j));
@@ -159,14 +191,15 @@ function collar(name: string, rows = 4, cols = 96): MeshData {
     circ += dist(ring[j]!, ring[j - 1]!);
     along.push(circ);
   }
-  const fit = fitIsotropic(TSHIRT_UV.COLLAR!, circ, height);
+  const fit = fitIsotropic(S.uv.COLLAR!, circ, height);
   const mesh = buildGrid(name, rows, cols, point, (i, j) => fit(along[j]!, (i / rows) * height));
   orientOutward(mesh, ([x, , z]) => [x, 0, z]);
   return mesh;
 }
 
-/** Génère les 5 zones du T-shirt col rond. */
-export function buildTshirtMeshes(): MeshData[] {
+/** Génère les 5 zones d’un vêtement à partir de sa silhouette (T-shirt par défaut). */
+export function buildTshirtMeshes(shape: Shape = TSHIRT_SHAPE): MeshData[] {
+  S = shape;
   return [
     bodyPanel("Zone_Body_Front", true),
     bodyPanel("Zone_Body_Back", false),

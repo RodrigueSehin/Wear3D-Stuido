@@ -1,6 +1,7 @@
 "use client";
 
 import { cn, Switch } from "@wear3d/ui";
+import { GARMENTS, getGarmentByVersion, TSHIRT_CLASSIC } from "@wear3d/garment-engine";
 import {
   Box,
   ChevronDown,
@@ -206,13 +207,14 @@ export function SettingsPanel() {
           <Row label="Type de vêtement">
             <SelectBox
               ariaLabel="Type de vêtement"
-              value={definition?.family ?? "tshirts"}
-              onChange={() => undefined}
+              value={definition?.versionId ?? TSHIRT_CLASSIC.versionId}
+              onChange={(v) => {
+                const next = getGarmentByVersion(v);
+                if (next) useStudio.getState().changeModel(next);
+              }}
               options={[
-                { value: "tshirts", label: "T-shirt col rond" },
-                { value: "football", label: "Maillot — bientôt", disabled: true },
-                { value: "polos", label: "Polo — bientôt", disabled: true },
-                { value: "hoodies", label: "Hoodie — bientôt", disabled: true },
+                ...GARMENTS.map((g) => ({ value: g.versionId, label: g.name })),
+                { value: "polo", label: "Polo — bientôt", disabled: true },
               ]}
             />
           </Row>

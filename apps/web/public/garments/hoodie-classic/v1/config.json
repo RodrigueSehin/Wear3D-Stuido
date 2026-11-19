@@ -1,0 +1,104 @@
+{
+  "reference": "HD-CLASSIC",
+  "versionId": "hoodie-classic@1",
+  "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
+  "materials": ["cotton", "polyester", "elastane", "knit", "microfiber", "technical"],
+  "zones": [
+    {
+      "code": "BODY_FRONT",
+      "meshName": "Zone_Body_Front",
+      "label": "Devant",
+      "uvRect": {
+        "x": 0.0078125,
+        "y": 0.0078125,
+        "w": 0.48828125,
+        "h": 0.6
+      },
+      "printAreaMm": {
+        "w": 320,
+        "h": 380
+      },
+      "allows": ["color", "material", "pattern", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    },
+    {
+      "code": "BODY_BACK",
+      "meshName": "Zone_Body_Back",
+      "label": "Dos",
+      "uvRect": {
+        "x": 0.50390625,
+        "y": 0.0078125,
+        "w": 0.48828125,
+        "h": 0.6
+      },
+      "printAreaMm": {
+        "w": 340,
+        "h": 500
+      },
+      "allows": ["color", "material", "pattern", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    },
+    {
+      "code": "SLEEVE_LEFT",
+      "meshName": "Zone_Sleeve_Left",
+      "label": "Manche gauche",
+      "uvRect": {
+        "x": 0.0078125,
+        "y": 0.615625,
+        "w": 0.48828125,
+        "h": 0.24
+      },
+      "printAreaMm": {
+        "w": 110,
+        "h": 400
+      },
+      "allows": ["color", "material", "pattern", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    },
+    {
+      "code": "SLEEVE_RIGHT",
+      "meshName": "Zone_Sleeve_Right",
+      "label": "Manche droite",
+      "uvRect": {
+        "x": 0.50390625,
+        "y": 0.615625,
+        "w": 0.48828125,
+        "h": 0.24
+      },
+      "printAreaMm": {
+        "w": 110,
+        "h": 400
+      },
+      "allows": ["color", "material", "pattern", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    },
+    {
+      "code": "COLLAR",
+      "meshName": "Zone_Collar",
+      "label": "Capuche",
+      "uvRect": {
+        "x": 0.0078125,
+        "y": 0.8634375,
+        "w": 0.984375,
+        "h": 0.1
+      },
+      "allows": ["color", "material", "text", "image"],
+      "defaults": {
+        "color": "#FFFFFF",
+        "material": "cotton"
+      }
+    }
+  ]
+}

@@ -213,9 +213,73 @@ export const PIECES: readonly PieceDef[] = [
   },
 ];
 
-/** Pièces du modèle : le bord de manche n'existe que si le modèle en a. */
-export function availablePieces(def: { trims?: { cuffs?: unknown } } | null): readonly PieceDef[] {
-  return PIECES.filter((p) => p.id !== "cuff" || Boolean(def?.trims?.cuffs));
+/** Manche longue : emmanchure arrondie puis tube qui se resserre vers le poignet. */
+const SLEEVE_LONG = (): Pt[] => {
+  const L: Pt = [0, 0.2];
+  const T: Pt = [0.5, 0];
+  const R: Pt = [1, 0.2];
+  return [[0.3, 1], L, ...quad(L, [0.12, 0.01], T, 12), ...quad(T, [0.88, 0.01], R, 12), [0.7, 1]];
+};
+
+/** Capuche : un côté, en forme de « L » arrondi (deux pièces assemblées au milieu). */
+const HOOD = (): Pt[] => [
+  [0.1, 1],
+  [0, 0.45],
+  ...quad([0, 0.45], [0, 0], [0.55, 0], 10),
+  ...quad([0.55, 0], [0.95, 0.02], [0.92, 0.45], 8),
+  [1, 1],
+];
+
+type Tweak = Partial<Pick<PieceDef, "label" | "base" | "step" | "shape" | "cut" | "sag">>;
+interface PatternProfile {
+  tweaks: Record<string, Tweak>;
+  /** Pièces absentes de ce vêtement. */
+  drop?: readonly string[];
+}
+
+const PROFILES: Record<string, PatternProfile> = {
+  tshirts: { tweaks: {} },
+  // Maillot : col en V devant, manches courtes, simple bord-côte à l'encolure.
+  football: {
+    tweaks: {
+      front: { base: [51, 70], shape: () => body(0.27) },
+      back: { base: [51, 70], shape: () => body(0.04) },
+      "sleeve-left": { base: [35, 19] },
+      "sleeve-right": { base: [35, 19] },
+      "collar-outer": { label: "Bord-côte d'encolure", base: [38, 3], sag: 8 },
+      cuff: { base: [24, 4] },
+    },
+    drop: ["collar-inner"],
+  },
+  // Hoodie : corps ample et long, manches longues, capuche en deux pièces.
+  hoodies: {
+    tweaks: {
+      front: { base: [58, 72], shape: () => body(0.1) },
+      back: { base: [58, 74], shape: () => body(0.04) },
+      "sleeve-left": { base: [38, 62], step: [1.6, 1], shape: SLEEVE_LONG },
+      "sleeve-right": { base: [38, 62], step: [1.6, 1], shape: SLEEVE_LONG },
+      "collar-outer": {
+        label: "Capuche (côté)",
+        base: [32, 36],
+        step: [1, 0.5],
+        sag: 0,
+        cut: 2,
+        shape: HOOD,
+      },
+      cuff: { base: [20, 9] },
+    },
+    drop: ["collar-inner"],
+  },
+};
+
+/** Pièces du modèle : forme, dimensions et pièces propres à chaque vêtement ; bord de manche seulement s'il en a. */
+export function availablePieces(
+  def: { family?: string; trims?: { cuffs?: unknown } } | null,
+): readonly PieceDef[] {
+  const profile = PROFILES[def?.family ?? "tshirts"] ?? PROFILES.tshirts!;
+  return PIECES.filter(
+    (p) => (p.id !== "cuff" || Boolean(def?.trims?.cuffs)) && !profile.drop?.includes(p.id),
+  ).map((p) => ({ ...p, ...profile.tweaks[p.id] }));
 }
 
 /* ---------- Tailles, réglages ---------- */

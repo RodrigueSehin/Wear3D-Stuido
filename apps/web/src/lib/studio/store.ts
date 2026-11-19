@@ -12,7 +12,12 @@ import type {
   Scene,
 } from "@wear3d/design-schema";
 import { SnapshotHistory } from "@wear3d/editor-2d";
-import type { GarmentDefinition, LightingPreset, ViewPreset } from "@wear3d/garment-engine";
+import {
+  getGarmentByVersion,
+  type GarmentDefinition,
+  type LightingPreset,
+  type ViewPreset,
+} from "@wear3d/garment-engine";
 import { create } from "zustand";
 import type { FlatMode } from "./flat-layout";
 import type { PatternSide, PatternTab, PatternUnit } from "./sewing";
@@ -82,6 +87,8 @@ interface StudioState {
   activeView: ViewPreset;
   recentColors: string[];
   saveState: SaveState;
+  /** Le design a été modifié dans un autre onglet : l’autosave attend le choix de l’utilisateur. */
+  conflict: boolean;
   lastSavedAt: Date | null;
   canUndo: boolean;
   canRedo: boolean;
@@ -93,6 +100,8 @@ interface StudioState {
     doc: DesignDocument;
   }): void;
   rename(name: string): void;
+  /** Change de vêtement en gardant les calques : les zones portent les mêmes codes. */
+  changeModel(definition: GarmentDefinition): void;
   /** Applique une modification au document ; `coalesceKey` regroupe un geste continu. */
   update(recipe: (doc: DesignDocument) => DesignDocument, coalesceKey?: string): void;
   seal(): void;
@@ -143,6 +152,7 @@ interface StudioState {
   setDragging(dragging: boolean): void;
   setActiveView(view: ViewPreset): void;
   pushRecentColor(color: string): void;
+  setConflict(conflict: boolean): void;
   setSaveState(state: SaveState): void;
 }
 
@@ -155,6 +165,13 @@ export function patternZones(doc: DesignDocument | null): string[] {
         .filter(([, z]) => z.pattern)
         .map(([code]) => code)
     : [];
+}
+
+/** Après annuler / rétablir : le vêtement affiché suit la version du modèle du document. */
+function garmentOf(s: { definition: GarmentDefinition | null }, doc: DesignDocument) {
+  if (s.definition?.versionId === doc.model.versionId) return {};
+  const definition = getGarmentByVersion(doc.model.versionId);
+  return definition ? { definition } : {};
 }
 
 export const useStudio = create<StudioState>()((set, get) => ({
@@ -185,6 +202,7 @@ export const useStudio = create<StudioState>()((set, get) => ({
   activeView: "front",
   recentColors: ["#1D4ED8", "#FFFFFF", "#0B1530", "#DC2626", "#16A34A", "#F5B70A", "#7C3AED"],
   saveState: "idle",
+  conflict: false,
   lastSavedAt: null,
   canUndo: false,
   canRedo: false,
@@ -200,6 +218,7 @@ export const useStudio = create<StudioState>()((set, get) => ({
       selection: null,
       selectedZone: definition.zones[0]?.code ?? null,
       saveState: "saved",
+      conflict: false,
       lastSavedAt: new Date(),
       ...flags(),
     });
@@ -207,6 +226,22 @@ export const useStudio = create<StudioState>()((set, get) => ({
 
   rename(name) {
     set((s) => ({ name, revision: s.revision + 1 }));
+  },
+
+  changeModel(definition) {
+    if (get().definition?.versionId === definition.versionId) return;
+    get().seal();
+    get().update((doc) => ({
+      ...doc,
+      model: { ...doc.model, versionId: definition.versionId },
+    }));
+    set((s) => ({
+      definition,
+      selectedZone: definition.zones.some((z) => z.code === s.selectedZone)
+        ? s.selectedZone
+        : (definition.zones[0]?.code ?? null),
+    }));
+    get().seal();
   },
 
   update(recipe, coalesceKey) {
@@ -227,7 +262,13 @@ export const useStudio = create<StudioState>()((set, get) => ({
     if (!doc) return;
     const prev = history.undo(doc);
     if (prev)
-      set((s) => ({ doc: prev, revision: s.revision + 1, ...flags(), ...keepSelection(s, prev) }));
+      set((s) => ({
+        doc: prev,
+        revision: s.revision + 1,
+        ...flags(),
+        ...keepSelection(s, prev),
+        ...garmentOf(s, prev),
+      }));
   },
 
   redo() {
@@ -235,7 +276,13 @@ export const useStudio = create<StudioState>()((set, get) => ({
     if (!doc) return;
     const next = history.redo(doc);
     if (next)
-      set((s) => ({ doc: next, revision: s.revision + 1, ...flags(), ...keepSelection(s, next) }));
+      set((s) => ({
+        doc: next,
+        revision: s.revision + 1,
+        ...flags(),
+        ...keepSelection(s, next),
+        ...garmentOf(s, next),
+      }));
   },
 
   setZoneColor(zone, color, coalesceKey) {
@@ -471,6 +518,10 @@ export const useStudio = create<StudioState>()((set, get) => ({
     const c = color.toUpperCase();
     set((s) => ({ recentColors: [c, ...s.recentColors.filter((x) => x !== c)].slice(0, 8) }));
   },
+  setConflict(conflict) {
+    set({ conflict });
+  },
+
   setSaveState(saveState) {
     set(saveState === "saved" ? { saveState, lastSavedAt: new Date() } : { saveState });
   },
