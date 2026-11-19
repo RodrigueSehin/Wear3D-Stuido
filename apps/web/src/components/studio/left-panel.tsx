@@ -1,21 +1,12 @@
 "use client";
 
-import {
-  createImageLayer,
-  createNumberLayer,
-  createTextLayer,
-  MATERIAL_CODES,
-  type MaterialCode,
-} from "@wear3d/design-schema";
-import { FABRIC_NAMES, LIGHTING_LABELS, type LightingPreset } from "@wear3d/garment-engine";
+import { MATERIAL_CODES, type MaterialCode } from "@wear3d/design-schema";
+import { FABRIC_NAMES } from "@wear3d/garment-engine";
 import { cn, Switch } from "@wear3d/ui";
-import { ArrowRight, Check, ChevronsLeft, ImagePlus, Loader2, Lock, Plus } from "lucide-react";
+import { ArrowRight, Check, ChevronsLeft } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ACCEPTED_TYPES, AssetImportError, ensureImage, importImage } from "@/lib/studio/assets";
-import { NUMBER_STYLES, STUDIO_FONTS } from "@/lib/studio/fonts";
+import { useMemo, useState } from "react";
 import { PATTERNS, patternPreview, PATTERN_PREFIX } from "@/lib/studio/patterns";
-import { listAssets, type StoredAsset } from "@/lib/studio/persistence";
 import {
   DESIGN_PRESETS,
   PRESET_STYLES,
@@ -27,10 +18,17 @@ import { useStudio, type LibraryTab, type RailItem } from "@/lib/studio/store";
 import { fabricSwatch } from "@/lib/studio/swatches";
 import { ColorPickerPanel, PanelCard, PanelTitle, SelectBox } from "./controls";
 import { JerseyThumb } from "./jersey-thumb";
+import { ElementsPanel } from "./elements-panel";
+import { LogosPanel } from "./logos-panel";
+import { MockupsPanel } from "./mockups-panel";
+import { ScenesPanel } from "./scenes-panel";
+import { SettingsPanel } from "./settings-panel";
+import { TexturesPanel } from "./textures-panel";
+import { TextsPanel } from "./texts-panel";
 
 const TITLES: Record<RailItem, string> = {
   design: "Bibliothèque",
-  textures: "Bibliothèque",
+  textures: "Textures",
   logos: "Logos",
   texts: "Textes",
   elements: "Éléments",
@@ -42,7 +40,8 @@ const TITLES: Record<RailItem, string> = {
 export function LeftPanel() {
   const rail = useStudio((s) => s.rail);
   const setOpen = useStudio((s) => s.setLibraryOpen);
-  const library = rail === "design" || rail === "textures";
+  const library = rail === "design";
+  const viewMode = useStudio((s) => s.viewMode);
   return (
     <PanelCard className="w-[300px] shrink-0">
       <PanelTitle
@@ -57,19 +56,31 @@ export function LeftPanel() {
           </button>
         }
       >
-        {TITLES[rail]}
+        {rail === "design" && viewMode === "2d" ? "Design 2D" : TITLES[rail]}
       </PanelTitle>
+      {library && viewMode === "2d" && (
+        <p className="text-muted-foreground -mt-2 px-5 pb-3 text-sm leading-snug">
+          Personnalisez le design en vue 2D (pour impression, sublimation ou coupe).
+        </p>
+      )}
       {library ? (
         <Library />
+      ) : rail === "textures" ? (
+        <TexturesPanel />
+      ) : rail === "logos" ? (
+        <LogosPanel />
+      ) : rail === "texts" ? (
+        <TextsPanel />
+      ) : rail === "elements" ? (
+        <ElementsPanel />
+      ) : rail === "settings" ? (
+        <SettingsPanel />
+      ) : rail === "scenes" ? (
+        <ScenesPanel />
+      ) : rail === "mockups" ? (
+        <MockupsPanel />
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
-          {rail === "logos" && <LogosPanel />}
-          {rail === "texts" && <TextsPanel />}
-          {rail === "elements" && <ElementsPanel />}
-          {rail === "mockups" && <MockupsPanel />}
-          {rail === "scenes" && <ScenesPanel />}
-          {rail === "settings" && <SettingsPanel />}
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5"></div>
       )}
     </PanelCard>
   );
@@ -146,7 +157,10 @@ function applyPreset(preset: DesignPreset) {
         material: z.allows.includes("material") ? preset.material : style.material,
       };
       if (body && preset.pattern) {
-        zones[z.code] = { ...next, pattern: { offsetX: 0, offsetY: 0, ...preset.pattern } };
+        zones[z.code] = {
+          ...next,
+          pattern: { offsetX: 0, offsetY: 0, blendMode: "normal", ...preset.pattern },
+        };
       } else {
         const { pattern: _p, ...rest } = next;
         zones[z.code] = body
@@ -236,7 +250,7 @@ function ModelsTab() {
 
 /* ---------- Couleurs ---------- */
 
-function ZoneChips() {
+function ZoneChips({ onPick }: { onPick?: () => void }) {
   const definition = useStudio((s) => s.definition);
   const doc = useStudio((s) => s.doc);
   const selectedZone = useStudio((s) => s.selectedZone);
@@ -247,7 +261,10 @@ function ZoneChips() {
         <button
           key={z.code}
           type="button"
-          onClick={() => selectZone(z.code)}
+          onClick={() => {
+            selectZone(z.code);
+            onPick?.();
+          }}
           onMouseEnter={() => useStudio.getState().setHoveredZone(z.code)}
           onMouseLeave={() => useStudio.getState().setHoveredZone(null)}
           aria-pressed={selectedZone === z.code}
@@ -269,23 +286,79 @@ function ZoneChips() {
   );
 }
 
+/** Groupes de couleur du vêtement (maquette « Design 2D ») : corps, manches, col. */
+const COLOR_GROUPS = [
+  { id: "primary", label: "Principale", match: (c: string) => c.startsWith("BODY") },
+  { id: "secondary", label: "Secondaire", match: (c: string) => c.startsWith("SLEEVE") },
+  { id: "tertiary", label: "Tertiaire", match: (c: string) => c === "COLLAR" },
+] as const;
+type ColorGroup = (typeof COLOR_GROUPS)[number]["id"];
+
 function ColorsTab() {
   const definition = useStudio((s) => s.definition);
   const doc = useStudio((s) => s.doc);
   const selectedZone = useStudio((s) => s.selectedZone);
   const recent = useStudio((s) => s.recentColors);
+  const [group, setGroup] = useState<ColorGroup | null>("primary");
+  const groupZones = (g: ColorGroup) =>
+    definition?.zones
+      .filter((z) => COLOR_GROUPS.find((x) => x.id === g)!.match(z.code))
+      .map((z) => z.code) ?? [];
   const zone = selectedZone ?? definition?.zones[0]?.code;
-  const color = (zone && doc?.zones[zone]?.color) || "#FFFFFF";
-  const { setZoneColor, setZonesColor, pushRecentColor, seal } = useStudio.getState();
+  const targets = group ? groupZones(group) : zone ? [zone] : [];
+  const color = (targets[0] && doc?.zones[targets[0]]?.color) || "#FFFFFF";
+  const { setZonesColor, pushRecentColor, seal, update } = useStudio.getState();
+  /** Couleur d'un groupe de zones : un geste continu = une étape d'historique. */
+  const paint = (c: string) =>
+    update(
+      (d) => {
+        const zones = { ...d.zones };
+        for (const code of targets) if (zones[code]) zones[code] = { ...zones[code], color: c };
+        return { ...d, zones };
+      },
+      `color:${targets.join(",")}`,
+    );
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-sm font-semibold text-[#0b1530]">Couleur du vêtement</p>
+      <div className="grid grid-cols-3 gap-2">
+        {COLOR_GROUPS.map((g) => {
+          const codes = groupZones(g.id);
+          const c = (codes[0] && doc?.zones[codes[0]]?.color) || "#FFFFFF";
+          return (
+            <button
+              key={g.id}
+              type="button"
+              aria-pressed={group === g.id}
+              disabled={codes.length === 0}
+              onClick={() => setGroup(g.id)}
+              className="flex flex-col items-start gap-1 text-xs text-[#0b1530] disabled:opacity-40"
+            >
+              {g.label}
+              <span
+                className={cn(
+                  "relative block h-12 w-full rounded-xl border-2 shadow-sm",
+                  group === g.id ? "border-action" : "border-black/10",
+                )}
+                style={{ background: c }}
+              >
+                {group === g.id && (
+                  <span className="bg-action absolute right-1 top-1 flex size-5 items-center justify-center rounded-full text-white ring-2 ring-white">
+                    <Check className="size-3.5" aria-hidden />
+                  </span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
       <p className="text-muted-foreground text-xs font-medium">Zones du vêtement</p>
-      <ZoneChips />
-      {zone && (
+      <ZoneChips onPick={() => setGroup(null)} />
+      {targets.length > 0 && (
         <ColorPickerPanel
           value={color}
           recent={recent}
-          onChange={(c) => setZoneColor(zone, c)}
+          onChange={paint}
           onCommit={(c) => {
             pushRecentColor(c);
             seal();
@@ -376,6 +449,7 @@ function PatternsTab() {
                   offsetX: 0,
                   offsetY: 0,
                   opacity: current?.opacity ?? 0.85,
+                  blendMode: current?.blendMode ?? "normal",
                 })
               }
               className={cn(
@@ -447,374 +521,3 @@ function FabricsTab() {
 }
 
 /* ---------- Autres panneaux du rail ---------- */
-
-function targetZone(capability: "text" | "image", fallback: string): string {
-  const s = useStudio.getState();
-  const zone = s.definition?.zones.find((z) => z.code === s.selectedZone);
-  return zone?.allows.includes(capability) ? zone.code : fallback;
-}
-
-function LogosPanel() {
-  const addLayer = useStudio((s) => s.addLayer);
-  const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [assets, setAssets] = useState<StoredAsset[]>([]);
-  const [urls, setUrls] = useState<Record<string, string>>({});
-
-  const refresh = async () => {
-    const list = (await listAssets()).filter((a) => !a.id.startsWith(PATTERN_PREFIX));
-    setAssets(list);
-    const entries = await Promise.all(
-      list.map(async (a) => {
-        const img = await ensureImage(a.id);
-        return [a.id, img ? (img.image as HTMLImageElement).src : ""] as const;
-      }),
-    );
-    setUrls(Object.fromEntries(entries));
-  };
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  const place = (asset: StoredAsset) => {
-    const layer = createImageLayer(targetZone("image", "BODY_FRONT"), asset.id);
-    layer.name = asset.name.replace(/\.[^.]+$/, "");
-    addLayer(layer);
-  };
-
-  async function onFiles(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const asset = await importImage(file);
-      place(asset);
-      await refresh();
-    } catch (e) {
-      setError(e instanceof AssetImportError ? e.message : "Import impossible");
-    } finally {
-      setBusy(false);
-      if (input.current) input.current.value = "";
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <button
-        type="button"
-        onClick={() => input.current?.click()}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault();
-          void onFiles(e.dataTransfer.files);
-        }}
-        className="border-action/40 bg-action-soft/50 hover:bg-action-soft flex flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-6 text-center"
-      >
-        {busy ? (
-          <Loader2 className="text-action size-7 animate-spin" aria-hidden />
-        ) : (
-          <ImagePlus className="text-action size-7" aria-hidden />
-        )}
-        <span className="text-action text-sm font-semibold">Importer un logo</span>
-        <span className="text-muted-foreground text-xs">PNG, JPG ou SVG — 20 Mo maximum</span>
-      </button>
-      <input
-        ref={input}
-        type="file"
-        accept={ACCEPTED_TYPES.join(",")}
-        className="sr-only"
-        onChange={(e) => void onFiles(e.target.files)}
-      />
-      {error && (
-        <p role="alert" className="text-danger text-sm">
-          {error}
-        </p>
-      )}
-      {assets.length > 0 && (
-        <>
-          <p className="text-muted-foreground text-xs font-medium">
-            Vos logos — cliquez pour placer
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {assets.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                title={a.name}
-                onClick={() => place(a)}
-                className="border-border hover:border-action flex aspect-square items-center justify-center rounded-xl border bg-white p-2"
-              >
-                {urls[a.id] && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={urls[a.id]}
-                    alt={a.name}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                )}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-const TEXT_PRESETS = [
-  { label: "Titre", value: "WEAR3D", size: 0.09, font: "anton" },
-  { label: "Sous-titre", value: "STUDIO", size: 0.05, font: "montserrat" },
-  { label: "Slogan", value: "Since 2026", size: 0.04, font: "oswald" },
-] as const;
-
-function TextsPanel() {
-  const addLayer = useStudio((s) => s.addLayer);
-  const add = (font: keyof typeof STUDIO_FONTS, value = "WEAR3D", size = 0.08) => {
-    const layer = createTextLayer(targetZone("text", "BODY_FRONT"), value);
-    layer.text.font = font;
-    layer.text.weight = STUDIO_FONTS[font].weight;
-    layer.text.size = size;
-    layer.text.color = "#FFFFFF";
-    addLayer(layer);
-  };
-  return (
-    <div className="flex flex-col gap-3">
-      {TEXT_PRESETS.map((p) => (
-        <button
-          key={p.label}
-          type="button"
-          onClick={() => add(p.font, p.value, p.size)}
-          className="border-border hover:border-action flex items-center justify-between rounded-xl border bg-white px-4 py-3 text-left"
-        >
-          <span>
-            <span className="text-muted-foreground block text-xs">{p.label}</span>
-            <span className={cn("block text-xl", STUDIO_FONTS[p.font].className)}>{p.value}</span>
-          </span>
-          <Plus className="text-muted-foreground size-4" aria-hidden />
-        </button>
-      ))}
-      <p className="text-muted-foreground mt-2 text-xs font-medium">Polices</p>
-      {(Object.keys(STUDIO_FONTS) as (keyof typeof STUDIO_FONTS)[]).map((k) => (
-        <button
-          key={k}
-          type="button"
-          onClick={() => add(k)}
-          className={cn(
-            "border-border hover:border-action flex items-center justify-between rounded-xl border bg-white px-4 py-2 text-lg",
-            STUDIO_FONTS[k].className,
-          )}
-        >
-          {STUDIO_FONTS[k].label}
-          <Plus className="text-muted-foreground size-4" aria-hidden />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ElementsPanel() {
-  const addLayer = useStudio((s) => s.addLayer);
-  const addNumber = (style: keyof typeof NUMBER_STYLES, withName: boolean) => {
-    const font = NUMBER_STYLES[style].font;
-    if (withName) {
-      const name = createTextLayer("BODY_BACK", "{player.name}");
-      name.name = "Nom du joueur";
-      name.text.font = font;
-      name.text.weight = STUDIO_FONTS[font].weight;
-      name.transform = { ...name.transform, x: 0.5, y: 0.18, w: 0.6 };
-      addLayer(name);
-    }
-    const number = createNumberLayer("BODY_BACK", "10");
-    number.number.style = style;
-    number.transform = { ...number.transform, x: 0.5, y: 0.45, w: 0.42 };
-    addLayer(number);
-  };
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-muted-foreground text-xs font-medium">Numéros sportifs</p>
-      {(Object.keys(NUMBER_STYLES) as (keyof typeof NUMBER_STYLES)[]).map((style) => (
-        <div
-          key={style}
-          className="border-border flex items-center gap-3 rounded-xl border bg-white p-2"
-        >
-          <span
-            className={cn(
-              "flex size-12 items-center justify-center rounded-lg bg-[#0a1638] text-2xl text-white",
-              STUDIO_FONTS[NUMBER_STYLES[style].font].className,
-            )}
-          >
-            10
-          </span>
-          <span className="flex-1 text-sm font-medium">{NUMBER_STYLES[style].label}</span>
-          <button
-            type="button"
-            onClick={() => addNumber(style, false)}
-            className="text-action hover:bg-action-soft rounded-md px-2 py-1 text-xs font-semibold"
-          >
-            Numéro
-          </button>
-          <button
-            type="button"
-            onClick={() => addNumber(style, true)}
-            className="text-action hover:bg-action-soft rounded-md px-2 py-1 text-xs font-semibold"
-          >
-            + Nom
-          </button>
-        </div>
-      ))}
-      <p className="text-muted-foreground text-xs">
-        Le nom utilise le jeton <code className="font-mono">{"{player.name}"}</code>, remplacé par
-        l&apos;effectif à l&apos;export groupé (phase 6).
-      </p>
-    </div>
-  );
-}
-
-function MockupsPanel() {
-  const definition = useStudio((s) => s.definition);
-  const doc = useStudio((s) => s.doc);
-  const update = useStudio((s) => s.update);
-  const models = [
-    { name: "T-shirt col rond", ref: "TS-CLASSIC", available: true },
-    { name: "Maillot de football", ref: "FB-HOME", available: false },
-    { name: "Hoodie", ref: "HD-CLASSIC", available: false },
-  ];
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        {models.map((m) => (
-          <div
-            key={m.ref}
-            className={cn(
-              "flex items-center gap-3 rounded-xl border-2 bg-white p-2",
-              definition?.reference === m.ref ? "border-action" : "border-transparent",
-              !m.available && "opacity-60",
-            )}
-          >
-            <JerseyThumb body="#E8EDF4" sleeves="#E8EDF4" collar="#94A3B8" className="size-12" />
-            <span className="flex-1">
-              <span className="block text-sm font-semibold">{m.name}</span>
-              <span className="text-muted-foreground block font-mono text-[11px]">{m.ref}</span>
-            </span>
-            {!m.available && (
-              <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                <Lock className="size-3" aria-hidden /> Phase 2
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-      <div>
-        <p className="text-muted-foreground mb-2 text-xs font-medium">Taille</p>
-        <div className="flex flex-wrap gap-1.5">
-          {definition?.sizes.map((size) => (
-            <button
-              key={size}
-              type="button"
-              aria-pressed={doc?.model.size === size}
-              onClick={() => update((d) => ({ ...d, model: { ...d.model, size } }))}
-              className={cn(
-                "min-w-10 rounded-lg border px-2 py-1.5 text-sm",
-                doc?.model.size === size
-                  ? "border-action bg-action-soft text-action"
-                  : "border-border bg-white",
-              )}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const SCENE_BG: Record<LightingPreset, string> = {
-  studio: "from-[#f3f6fc] to-[#d9e3f5]",
-  outdoor: "from-[#bcd3f2] to-[#f5ead7]",
-  showroom: "from-[#1a2752] to-[#070d1f]",
-};
-
-function ScenesPanel() {
-  const lighting = useStudio((s) => s.lighting);
-  const setLighting = useStudio((s) => s.setLighting);
-  const showPodium = useStudio((s) => s.showPodium);
-  const setShowPodium = useStudio((s) => s.setShowPodium);
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-2">
-        {(Object.keys(LIGHTING_LABELS) as LightingPreset[]).map((p) => (
-          <button
-            key={p}
-            type="button"
-            aria-pressed={lighting === p}
-            onClick={() => setLighting(p)}
-            className={cn(
-              "flex h-16 items-end rounded-xl border-2 bg-gradient-to-br p-3 text-left text-sm font-semibold",
-              SCENE_BG[p],
-              p === "showroom" ? "text-white" : "text-[#0b1530]",
-              lighting === p ? "border-action" : "border-transparent",
-            )}
-          >
-            {LIGHTING_LABELS[p]}
-          </button>
-        ))}
-      </div>
-      <label className="flex items-center justify-between text-sm">
-        Podium lumineux
-        <Switch checked={showPodium} onCheckedChange={setShowPodium} />
-      </label>
-    </div>
-  );
-}
-
-const SHORTCUTS = [
-  ["Ctrl + Z", "Annuler"],
-  ["Ctrl + Y", "Rétablir"],
-  ["Ctrl + D", "Dupliquer"],
-  ["Suppr", "Supprimer"],
-  ["Flèches", "Déplacer (Maj = ×4)"],
-  ["Échap", "Désélectionner"],
-] as const;
-
-function SettingsPanel() {
-  return (
-    <div className="flex flex-col gap-4">
-      <MockupsPanelSizes />
-      <div>
-        <p className="text-muted-foreground mb-2 text-xs font-medium">Raccourcis clavier</p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-          {SHORTCUTS.map(([k, v]) => (
-            <div key={k} className="contents">
-              <dt>
-                <kbd className="border-border rounded border bg-white px-1.5 py-0.5 font-mono text-xs">
-                  {k}
-                </kbd>
-              </dt>
-              <dd className="text-muted-foreground">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </div>
-  );
-}
-
-function MockupsPanelSizes() {
-  const definition = useStudio((s) => s.definition);
-  return (
-    <div>
-      <p className="text-muted-foreground mb-2 text-xs font-medium">Zones du modèle</p>
-      <ul className="flex flex-col gap-1 text-sm">
-        {definition?.zones.map((z) => (
-          <li key={z.code} className="flex justify-between">
-            {z.label}
-            <span className="text-muted-foreground font-mono text-xs">{z.code}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}

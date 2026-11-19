@@ -22,9 +22,14 @@ export function AtlasComposer() {
 
   useEffect(() => {
     if (!doc) return;
-    const missing = doc.layers.flatMap((l) =>
-      l.type === "image" && !getCachedImage(l.assetId) ? [l.assetId] : [],
+    // Images des calques et motifs importés (maquettes) : chargées avant composition.
+    const patternAssets = Object.values(doc.zones).flatMap((z) =>
+      z.pattern && !z.pattern.assetId.startsWith("pattern:") ? [z.pattern.assetId] : [],
     );
+    const missing = [
+      ...doc.layers.flatMap((l) => (l.type === "image" ? [l.assetId] : [])),
+      ...patternAssets,
+    ].filter((id, i, all) => all.indexOf(id) === i && !getCachedImage(id));
     if (missing.length)
       void Promise.all(missing.map(ensureImage)).then(() => setAssetsVersion((v) => v + 1));
   }, [doc]);

@@ -9,16 +9,34 @@ export interface PatternDef {
   label: string;
   /** placed = motif unique couvrant la zone ; repeat = tuile répétée. */
   mode: "placed" | "repeat";
+  /** pattern = motif graphique ; effect = effet d'ombrage / lumière (onglet « Effets »). */
+  kind: "pattern" | "effect";
   draw: (ctx: CanvasRenderingContext2D, size: number) => void;
 }
 
 const S = 512;
+
+/** Couleur hexadécimale (#RRGGBB) avec opacité, pour les dégradés vers le transparent. */
+function withAlpha(hex: string, alpha: number): string {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/** Générateur pseudo-aléatoire déterministe (tuiles identiques à chaque rendu). */
+function rng(seed: number): () => number {
+  let t = seed;
+  return () => {
+    t = (t * 1664525 + 1013904223) % 4294967296;
+    return t / 4294967296;
+  };
+}
 
 export const PATTERNS: readonly PatternDef[] = [
   {
     code: "band-diagonal",
     label: "Bandes diagonales",
     mode: "placed",
+    kind: "pattern",
     draw(ctx, s) {
       // Trois bandes parallèles de largeurs différentes, comme le maillot de la maquette.
       ctx.translate(s / 2, s / 2);
@@ -37,6 +55,7 @@ export const PATTERNS: readonly PatternDef[] = [
     code: "shards",
     label: "Éclats géométriques",
     mode: "placed",
+    kind: "pattern",
     draw(ctx, s) {
       const tris: [number, number][][] = [
         [
@@ -83,6 +102,7 @@ export const PATTERNS: readonly PatternDef[] = [
     code: "chevron",
     label: "Chevron",
     mode: "placed",
+    kind: "pattern",
     draw(ctx, s) {
       ctx.beginPath();
       ctx.moveTo(0, s * 0.35);
@@ -99,6 +119,7 @@ export const PATTERNS: readonly PatternDef[] = [
     code: "stripes",
     label: "Rayures",
     mode: "repeat",
+    kind: "pattern",
     draw(ctx, s) {
       ctx.fillRect(0, 0, s * 0.35, s);
     },
@@ -107,6 +128,7 @@ export const PATTERNS: readonly PatternDef[] = [
     code: "diagonal",
     label: "Fines diagonales",
     mode: "repeat",
+    kind: "pattern",
     draw(ctx, s) {
       ctx.lineWidth = s * 0.12;
       ctx.strokeStyle = ctx.fillStyle;
@@ -122,6 +144,7 @@ export const PATTERNS: readonly PatternDef[] = [
     code: "dots",
     label: "Points",
     mode: "repeat",
+    kind: "pattern",
     draw(ctx, s) {
       for (const [x, y] of [
         [0.25, 0.25],
@@ -137,6 +160,7 @@ export const PATTERNS: readonly PatternDef[] = [
     code: "hexagons",
     label: "Nid d'abeille",
     mode: "repeat",
+    kind: "pattern",
     draw(ctx, s) {
       ctx.lineWidth = s * 0.04;
       ctx.strokeStyle = ctx.fillStyle;
@@ -159,6 +183,98 @@ export const PATTERNS: readonly PatternDef[] = [
         }
         ctx.closePath();
         ctx.stroke();
+      }
+    },
+  },
+  {
+    code: "camouflage",
+    label: "Camouflage",
+    mode: "repeat",
+    kind: "pattern",
+    draw(ctx, s) {
+      const rand = rng(7);
+      for (let i = 0; i < 26; i++) {
+        const x = rand() * s;
+        const y = rand() * s;
+        const rx = s * (0.07 + rand() * 0.09);
+        const ry = rx * (0.5 + rand() * 0.6);
+        const rot = rand() * Math.PI;
+        ctx.globalAlpha = 0.45 + rand() * 0.45;
+        // Dessiné aux 4 coins pour que la tuile se raccorde.
+        for (const [dx, dy] of [
+          [0, 0],
+          [s, 0],
+          [-s, 0],
+          [0, s],
+          [0, -s],
+        ] as const) {
+          ctx.beginPath();
+          ctx.ellipse(x + dx, y + dy, rx, ry, rot, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    },
+  },
+  {
+    code: "gradient",
+    label: "Dégradé",
+    mode: "placed",
+    kind: "effect",
+    draw(ctx, s) {
+      const g = ctx.createLinearGradient(0, s, 0, 0);
+      const c = ctx.fillStyle as string;
+      g.addColorStop(0, withAlpha(c, 0.95));
+      g.addColorStop(0.55, withAlpha(c, 0.35));
+      g.addColorStop(1, withAlpha(c, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+    },
+  },
+  {
+    code: "spotlight",
+    label: "Halo lumineux",
+    mode: "placed",
+    kind: "effect",
+    draw(ctx, s) {
+      const c = ctx.fillStyle as string;
+      const g = ctx.createRadialGradient(s * 0.5, s * 0.4, 0, s * 0.5, s * 0.4, s * 0.6);
+      g.addColorStop(0, withAlpha(c, 0.9));
+      g.addColorStop(1, withAlpha(c, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+    },
+  },
+  {
+    code: "grain",
+    label: "Grain",
+    mode: "repeat",
+    kind: "effect",
+    draw(ctx, s) {
+      const rand = rng(3);
+      for (let i = 0; i < 1400; i++) {
+        ctx.globalAlpha = 0.15 + rand() * 0.5;
+        const r = 0.6 + rand() * 1.4;
+        ctx.beginPath();
+        ctx.arc(rand() * s, rand() * s, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    },
+  },
+  {
+    code: "splatter",
+    label: "Éclaboussures",
+    mode: "placed",
+    kind: "effect",
+    draw(ctx, s) {
+      const rand = rng(11);
+      for (let i = 0; i < 70; i++) {
+        const t = rand();
+        const x = s * (0.1 + rand() * 0.8);
+        const y = s * (0.1 + rand() * 0.8);
+        ctx.globalAlpha = 0.35 + rand() * 0.6;
+        ctx.beginPath();
+        ctx.arc(x, y, s * (0.004 + t * t * 0.03), 0, Math.PI * 2);
+        ctx.fill();
       }
     },
   },

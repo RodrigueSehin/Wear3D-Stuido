@@ -4,9 +4,11 @@
  * nettoyage SVG, recompression) s'ajoute en phase 3.
  */
 import type { ImageSource } from "@wear3d/editor-2d";
+import { elementByAssetId, elementSvg } from "./elements";
+import { logoByAssetId, logoSvg } from "./logos";
 import { loadAsset, saveAsset, type StoredAsset } from "./persistence";
 
-export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/svg+xml"] as const;
 
 const cache = new Map<string, ImageSource>();
@@ -80,15 +82,15 @@ function decode(blob: Blob): Promise<ImageSource> {
 }
 
 /** Importe un fichier utilisateur : contrôle, stockage local, mise en cache. */
-export async function importImage(file: File): Promise<StoredAsset> {
+export async function importImage(file: File, idPrefix = "asset_"): Promise<StoredAsset> {
   if (file.size > MAX_UPLOAD_BYTES)
-    throw new AssetImportError("Fichier trop lourd (20 Mo maximum)");
+    throw new AssetImportError("Fichier trop lourd (10 Mo maximum)");
   const type = await sniffType(file);
   if (!type) throw new AssetImportError("Format non pris en charge (PNG, JPG ou SVG)");
   const blob = type === "image/svg+xml" ? await sanitizeSvg(file) : file;
   const source = await decode(blob);
   const asset: StoredAsset = {
-    id: `asset_${crypto.randomUUID()}`,
+    id: `${idPrefix}${crypto.randomUUID()}`,
     name: file.name,
     type,
     blob,
@@ -110,8 +112,15 @@ export function ensureImage(assetId: string): Promise<ImageSource | undefined> {
   if (hit) return Promise.resolve(hit);
   let p = pending.get(assetId);
   if (!p) {
-    p = loadAsset(assetId)
-      .then((asset) => (asset ? decode(asset.blob) : undefined))
+    // Logo intégré : rasterisé depuis son SVG, sans passer par le stockage local.
+    const builtin = logoByAssetId(assetId);
+    const element = elementByAssetId(assetId);
+    const svg = builtin ? logoSvg(builtin) : element ? elementSvg(element, "#000000") : null;
+    p = (
+      svg
+        ? decode(new Blob([svg], { type: "image/svg+xml" }))
+        : loadAsset(assetId).then((asset) => (asset ? decode(asset.blob) : undefined))
+    )
       .then((src) => {
         if (src) cache.set(assetId, src);
         return src;

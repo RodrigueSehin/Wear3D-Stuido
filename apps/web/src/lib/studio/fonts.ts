@@ -2,12 +2,30 @@
  * Polices du studio (sous-ensemble du catalogue de 30 polices, CDC F-21).
  * Les familles CSS générées par next/font sont transmises au compositeur Canvas.
  */
-import { Anton, Bebas_Neue, Montserrat, Oswald } from "next/font/google";
+import {
+  Anton,
+  Archivo_Black,
+  Barlow_Condensed,
+  Bebas_Neue,
+  Montserrat,
+  Oswald,
+  Pacifico,
+  Russo_One,
+  Staatliches,
+  Teko,
+} from "next/font/google";
 
 const anton = Anton({ subsets: ["latin"], weight: "400", display: "block" });
 const oswald = Oswald({ subsets: ["latin"], weight: ["500", "700"], display: "block" });
 const bebas = Bebas_Neue({ subsets: ["latin"], weight: "400", display: "block" });
 const montserrat = Montserrat({ subsets: ["latin"], weight: ["600", "800"], display: "block" });
+
+const teko = Teko({ subsets: ["latin"], weight: ["500", "700"], display: "block" });
+const barlow = Barlow_Condensed({ subsets: ["latin"], weight: ["600", "700"], display: "block" });
+const archivo = Archivo_Black({ subsets: ["latin"], weight: "400", display: "block" });
+const staatliches = Staatliches({ subsets: ["latin"], weight: "400", display: "block" });
+const russo = Russo_One({ subsets: ["latin"], weight: "400", display: "block" });
+const pacifico = Pacifico({ subsets: ["latin"], weight: "400", display: "block" });
 
 export const STUDIO_FONTS = {
   anton: {
@@ -33,6 +51,37 @@ export const STUDIO_FONTS = {
     family: montserrat.style.fontFamily,
     className: montserrat.className,
     weight: 800,
+  },
+  teko: { label: "Teko", family: teko.style.fontFamily, className: teko.className, weight: 700 },
+  barlow: {
+    label: "Barlow Condensed",
+    family: barlow.style.fontFamily,
+    className: barlow.className,
+    weight: 700,
+  },
+  archivo: {
+    label: "Archivo Black",
+    family: archivo.style.fontFamily,
+    className: archivo.className,
+    weight: 400,
+  },
+  staatliches: {
+    label: "Staatliches",
+    family: staatliches.style.fontFamily,
+    className: staatliches.className,
+    weight: 400,
+  },
+  russo: {
+    label: "Russo One",
+    family: russo.style.fontFamily,
+    className: russo.className,
+    weight: 400,
+  },
+  pacifico: {
+    label: "Pacifico",
+    family: pacifico.style.fontFamily,
+    className: pacifico.className,
+    weight: 400,
   },
 } as const;
 

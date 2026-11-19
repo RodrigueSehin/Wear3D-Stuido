@@ -4,7 +4,7 @@
  *
  * Fonctionne avec tout contexte compatible Canvas 2D (DOM, OffscreenCanvas).
  */
-import type { BlendMode, DesignDocument, Layer, Pattern } from "@wear3d/design-schema";
+import type { BlendMode, DesignDocument, Layer, Pattern, TextLayer } from "@wear3d/design-schema";
 import {
   layerSizePx,
   naturalSizePx,
@@ -96,6 +96,7 @@ function drawPattern(ctx: Ctx2D, pattern: Pattern, px: PxRect, opts: ComposeOpti
   ctx.rect(px.x - 4, px.y - 4, px.w + 8, px.h + 8);
   ctx.clip();
   ctx.globalAlpha = pattern.opacity;
+  ctx.globalCompositeOperation = COMPOSITE[pattern.blendMode ?? "normal"] ?? "source-over";
   const cx = px.x + px.w / 2 + pattern.offsetX * px.w;
   const cy = px.y + px.h / 2 + pattern.offsetY * px.h;
   ctx.translate(cx, cy);
@@ -181,27 +182,7 @@ function drawContent(
   const H = zonePx.h;
   switch (layer.type) {
     case "text": {
-      const { text } = layer;
-      const fontPx = text.size * H;
-      const maxWidth = natural.w;
-      ctx.font = `${text.weight} ${fontPx}px ${opts.resolveFont(text.font)}`;
-      setLetterSpacing(ctx, text.letterSpacing * fontPx);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      strokeText(ctx, text.value, maxWidth, [
-        outline.enabled
-          ? {
-              color: outline.color,
-              width: outline.width * H * 2 + (text.stroke?.width ?? 0) * H * 4,
-            }
-          : null,
-        text.stroke && text.stroke.width > 0
-          ? { color: text.stroke.color, width: text.stroke.width * H * 2 }
-          : null,
-      ]);
-      ctx.fillStyle = text.color;
-      ctx.fillText(text.value, 0, 0, maxWidth);
-      setLetterSpacing(ctx, 0);
+      drawText(ctx, layer, H, opts, natural, outline);
       return;
     }
     case "number": {
@@ -210,7 +191,7 @@ function drawContent(
       ctx.font = `700 ${numberFontPx(boxW)}px ${opts.resolveNumberFont(number.style)}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      strokeText(ctx, number.value, boxW, [
+      strokeText(ctx, number.value, 0, 0, boxW, [
         outline.enabled
           ? {
               color: outline.color,
@@ -232,7 +213,11 @@ function drawContent(
       if (outline.enabled && !effectPass && opts.createCanvas) {
         drawImageOutline(ctx, src, w, h, outline.color, outline.width * H, opts.createCanvas);
       }
-      ctx.drawImage(src.image, -w / 2, -h / 2, w, h);
+      const tinted =
+        layer.tint && opts.createCanvas
+          ? tintedImage(src, w, h, layer.tint, opts.createCanvas)
+          : null;
+      ctx.drawImage(tinted ?? src.image, -w / 2, -h / 2, w, h);
       return;
     }
   }
@@ -241,7 +226,9 @@ function drawContent(
 function strokeText(
   ctx: Ctx2D,
   value: string,
-  maxWidth: number,
+  x: number,
+  y: number,
+  maxWidth: number | undefined,
   strokes: ({ color: string; width: number } | null)[],
 ): void {
   ctx.lineJoin = "round";
@@ -249,8 +236,136 @@ function strokeText(
     if (!s || s.width <= 0) continue;
     ctx.strokeStyle = s.color;
     ctx.lineWidth = s.width;
-    ctx.strokeText(value, 0, 0, maxWidth);
+    ctx.strokeText(value, x, y, maxWidth);
   }
+}
+
+function textGradient(
+  ctx: Ctx2D,
+  g: NonNullable<TextLayer["text"]["gradient"]>,
+  w: number,
+  h: number,
+): CanvasGradient {
+  const a = (g.angle * Math.PI) / 180;
+  const vx = Math.cos(a);
+  const vy = Math.sin(a);
+  const r = (Math.abs(w * vx) + Math.abs(h * vy)) / 2;
+  const grad = ctx.createLinearGradient(-vx * r, -vy * r, vx * r, vy * r);
+  grad.addColorStop(0, g.from);
+  grad.addColorStop(1, g.to);
+  return grad;
+}
+
+/**
+ * Texte éditable : toujours dessiné depuis les données du calque (jamais converti en image),
+ * avec italique, souligné, alignement, interligne, dégradé, relief, angles arrondis et arc.
+ */
+function drawText(
+  ctx: Ctx2D,
+  layer: TextLayer,
+  H: number,
+  opts: ComposeOptions,
+  natural: { w: number; h: number },
+  outline: Layer["effects"]["outline"],
+): void {
+  const { text } = layer;
+  const fontPx = text.size * H;
+  const maxW = natural.w;
+  const lineStep = fontPx * 1.15 * text.lineHeight;
+  const lines = text.value.split("\n");
+  const arcRad = (Math.abs(text.arc) * Math.PI) / 180;
+  ctx.font = `${text.italic ? "italic " : ""}${text.weight} ${fontPx}px ${opts.resolveFont(text.font)}`;
+  ctx.textBaseline = "middle";
+  const fill: string | CanvasGradient = text.gradient
+    ? textGradient(ctx, text.gradient, maxW, natural.h)
+    : text.color;
+  const strokes = [
+    outline.enabled
+      ? { color: outline.color, width: outline.width * H * 2 + (text.stroke?.width ?? 0) * H * 4 }
+      : null,
+    text.stroke && text.stroke.width > 0
+      ? { color: text.stroke.color, width: text.stroke.width * H * 2 }
+      : null,
+  ];
+  const d = fontPx * 0.03;
+
+  const paint = (s: string, x: number, y: number, maxWidth: number | undefined) => {
+    strokeText(ctx, s, x, y, maxWidth, strokes);
+    if (text.rounded) {
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = fill;
+      ctx.lineWidth = fontPx * 0.07;
+      ctx.strokeText(s, x, y, maxWidth);
+    }
+    if (text.relief) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.fillText(s, x + d, y + d, maxWidth);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+      ctx.fillText(s, x - d, y - d, maxWidth);
+    }
+    ctx.fillStyle = fill;
+    ctx.fillText(s, x, y, maxWidth);
+  };
+
+  lines.forEach((line, i) => {
+    const y = (i - (lines.length - 1) / 2) * lineStep;
+    if (arcRad > 0.001 && line.length > 0) {
+      // Texte arqué : chaque lettre posée sur un cercle, orientée selon la tangente.
+      setLetterSpacing(ctx, 0);
+      ctx.textAlign = "center";
+      const spacing = text.letterSpacing * fontPx;
+      const adv = [...line].map((ch) => ctx.measureText(ch).width + spacing);
+      const total = adv.reduce((a, b) => a + b, 0);
+      const R = total / arcRad;
+      const chord = 2 * R * Math.sin(Math.min(arcRad, Math.PI) / 2);
+      const k = Math.min(1, maxW / Math.max(1, chord));
+      const sign = text.arc > 0 ? 1 : -1;
+      let s = -total / 2;
+      [...line].forEach((ch, n) => {
+        const a = adv[n]!;
+        const th = (s + a / 2) / R;
+        ctx.save();
+        ctx.translate(R * Math.sin(th) * k, y + sign * R * (1 - Math.cos(th)) * k);
+        ctx.rotate(sign * th);
+        ctx.scale(k, k);
+        paint(ch, 0, 0, undefined);
+        ctx.restore();
+        s += a;
+      });
+      return;
+    }
+    setLetterSpacing(ctx, text.letterSpacing * fontPx);
+    ctx.textAlign = text.align;
+    const x = text.align === "left" ? -maxW / 2 : text.align === "right" ? maxW / 2 : 0;
+    paint(line, x, y, maxW);
+    if (text.underline && line.length > 0) {
+      const w = Math.min(ctx.measureText(line).width, maxW);
+      const x0 = text.align === "left" ? x : text.align === "right" ? x - w : x - w / 2;
+      ctx.fillStyle = fill;
+      ctx.fillRect(x0, y + fontPx * 0.4, w, Math.max(1, fontPx * 0.06));
+    }
+    setLetterSpacing(ctx, 0);
+  });
+}
+
+/** Image recolorée d'une seule couleur (silhouette), ou null si impossible. */
+function tintedImage(
+  src: ImageSource,
+  w: number,
+  h: number,
+  color: string,
+  createCanvas: NonNullable<ComposeOptions["createCanvas"]>,
+): CanvasImageSource | null {
+  const cw = Math.max(1, Math.ceil(w));
+  const ch = Math.max(1, Math.ceil(h));
+  const canvas = createCanvas(cw, ch);
+  const c = canvas.getContext("2d") as Ctx2D | null;
+  if (!c) return null;
+  c.drawImage(src.image, 0, 0, cw, ch);
+  c.globalCompositeOperation = "source-in";
+  c.fillStyle = color;
+  c.fillRect(0, 0, cw, ch);
+  return canvas;
 }
 
 /** Contour d'image : silhouette colorée dessinée autour (8 directions). */

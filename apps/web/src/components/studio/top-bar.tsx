@@ -29,6 +29,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { EXPORT_RESOLUTIONS, JPG_QUALITY, renderSizeOf, useSettings } from "@/lib/studio/settings";
+import { resolveBackdropUrl } from "@/lib/studio/scene-backdrop";
+import { sceneFilter } from "@/lib/studio/scenes";
 import { useStudio, type SaveState } from "@/lib/studio/store";
 import { captureImage, downloadBlob, slugify, type ExportFormat } from "@/lib/studio/viewer-bridge";
 
@@ -98,11 +101,40 @@ export function TopBar() {
   const name = useStudio((s) => s.name);
   const [busy, setBusy] = useState<string | null>(null);
 
+  const settings = useSettings();
+  const exportLabel =
+    EXPORT_RESOLUTIONS.find((r) => r.width === settings.exportWidth)?.label ??
+    `${settings.exportWidth} px`;
+
+  /** « Rendu HD » : taille et qualité des Paramètres ; export : résolution par défaut. */
   async function run(kind: string, format: ExportFormat, hd = false) {
     setBusy(kind);
     try {
-      const blob = await captureImage(format, hd);
-      downloadBlob(blob, `${slugify(name) || "wear3d-design"}${hd ? "-hd" : ""}.${format}`);
+      const quality = JPG_QUALITY[settings.quality];
+      // Scène : décor (si inclus à l'export) et ajustements appliqués à l'image.
+      const scene = useStudio.getState().doc?.scene;
+      const url = scene?.includeInExport ? await resolveBackdropUrl(scene.id) : null;
+      const sceneOpts = {
+        filter: sceneFilter(scene),
+        ...(url && scene ? { backdrop: { url, blur: scene.backgroundBlur } } : {}),
+      };
+      const size = renderSizeOf(settings.renderSize);
+      const blob = hd
+        ? await captureImage(format, {
+            width: size.w,
+            height: size.h,
+            hd: true,
+            quality,
+            ...sceneOpts,
+          })
+        : await captureImage(format, {
+            width: settings.exportWidth,
+            hd: settings.exportWidth > 2048,
+            quality,
+            ...sceneOpts,
+          });
+      const suffix = hd ? `-${size.w}x${size.h}` : `-${settings.exportWidth}`;
+      downloadBlob(blob, `${slugify(name) || "wear3d-design"}${suffix}.${format}`);
     } finally {
       setBusy(null);
     }
@@ -190,6 +222,10 @@ export function TopBar() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuItem onSelect={() => void run("default", settings.exportFormat)}>
+              <FileImage /> Export rapide — {settings.exportFormat.toUpperCase()} · {exportLabel}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuLabel>Format d&apos;export</DropdownMenuLabel>
             <DropdownMenuItem onSelect={() => void run("png", "png")}>
               <FileImage /> Image PNG (fond transparent)

@@ -7,6 +7,7 @@ import { createStore, del, get, keys, set, values } from "idb-keyval";
 
 const designs = () => createStore("wear3d-studio", "designs");
 const assets = () => createStore("wear3d-assets", "assets");
+const sceneImages = () => createStore("wear3d-scenes", "images");
 
 export interface StoredDesign {
   id: string;
@@ -54,4 +55,31 @@ export async function loadAsset(id: string): Promise<StoredAsset | undefined> {
 /** Logos et images importés localement (bibliothèque « Logos »). */
 export async function listAssets(): Promise<StoredAsset[]> {
   return values<StoredAsset>(assets());
+}
+
+export async function deleteAsset(id: string): Promise<void> {
+  await del(id, assets());
+}
+
+/** Décors de scène importés (JPG, PNG), séparés des logos. */
+export interface StoredSceneImage {
+  id: string;
+  name: string;
+  blob: Blob;
+}
+
+export async function saveSceneImage(image: StoredSceneImage): Promise<void> {
+  await set(image.id, image, sceneImages());
+}
+
+export async function listSceneImages(): Promise<StoredSceneImage[]> {
+  return values<StoredSceneImage>(sceneImages());
+}
+
+export async function loadSceneImage(id: string): Promise<StoredSceneImage | undefined> {
+  return get<StoredSceneImage>(id, sceneImages());
+}
+
+export async function deleteSceneImage(id: string): Promise<void> {
+  await del(id, sceneImages());
 }

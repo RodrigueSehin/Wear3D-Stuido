@@ -83,6 +83,7 @@ describe("store du studio", () => {
       offsetX: 0,
       offsetY: 0,
       opacity: 0.8,
+      blendMode: "normal" as const,
     };
     s.setZonesPattern(["BODY_FRONT", "BODY_BACK"], pattern);
     expect(patternZones(useStudio.getState().doc)).toEqual(["BODY_FRONT", "BODY_BACK"]);

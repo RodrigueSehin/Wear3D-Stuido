@@ -44,6 +44,8 @@ export interface GarmentViewerHandle {
   capture(width?: number): Promise<Blob>;
   /** Miniatures (data URL) de plusieurs vues, sans déplacer la caméra principale. */
   snapshot(views: readonly ViewPreset[]): Record<string, string>;
+  /** Point du vêtement sous une position d'écran (glisser-déposer), du plus proche au plus loin. */
+  pick(clientX: number, clientY: number): SurfaceHit[];
 }
 
 export interface GarmentViewerProps {
@@ -58,6 +60,36 @@ export interface GarmentViewerProps {
   tool?: ViewerTool;
   showPodium?: boolean;
   autoRotate?: boolean;
+  /** Densité de pixels du rendu (Paramètres → Résolution). */
+  dpr?: number | [number, number];
+  /** Anticrénelage (recrée le contexte WebGL quand il change). */
+  antialias?: boolean;
+  /** Ombres réalistes (ombres portées et ombre de contact). */
+  shadows?: boolean;
+  /** Grille de repère au sol. */
+  showGrid?: boolean;
+  /** Axe de rotation vertical et cercle de rotation. */
+  showAxes?: boolean;
+  /** Échelle d'affichage du modèle (1 = 100 %), autour du sol. */
+  modelScale?: number;
+  /** Reflets du tissu (sheen). */
+  fabricSheen?: boolean;
+  /** Détails et reliefs de la maille (normal maps). */
+  fabricRelief?: boolean;
+  /** Couleur des repères (grille, axe). */
+  guideColor?: string;
+  /** Intensité de l'éclairage (1 = 100 %), appliquée aux lumières et à l'environnement. */
+  lightIntensity?: number;
+  /** Angle de la lumière principale autour du vêtement, en degrés (0 = face). */
+  lightAngle?: number;
+  /** Teinte de la lumière (ambiance jour / soir / nuit). */
+  lightColor?: string;
+  /** Exposition du rendu (1 = neutre). */
+  exposure?: number;
+  /** Ombre au sol (ombre de contact). */
+  groundShadow?: boolean;
+  /** Plateau du podium en miroir (reflet). */
+  podiumReflect?: boolean;
   /** Désactive la caméra pendant un glisser de calque. */
   interacting?: boolean;
   /** Renvoie true pour capturer le geste (glisser un calque) : la caméra est coupée aussitôt. */
@@ -91,6 +123,8 @@ function GarmentModel({
   onSurfaceMove,
   onHoverZone,
   onReady,
+  fabricSheen = true,
+  fabricRelief = true,
 }: GarmentViewerProps) {
   const { scene } = useGLTF(definition.glbUrl);
   const invalidate = useThree((s) => s.invalidate);
@@ -128,18 +162,18 @@ function GarmentModel({
     for (const [zone, material] of zoneMaterials) {
       const preset = MATERIAL_PRESETS[materials[zone] ?? "cotton"];
       material.roughness = preset.roughness;
-      material.sheen = preset.sheen;
+      material.sheen = fabricSheen ? preset.sheen : 0;
       material.sheenRoughness = preset.sheenRoughness;
       const normal = weaveNormalMap(preset.weave).clone();
       normal.repeat.set(preset.weaveRepeat, preset.weaveRepeat);
       normal.needsUpdate = true;
       material.normalMap?.dispose();
-      material.normalMap = normal;
+      material.normalMap = fabricRelief ? normal : null;
       material.normalScale.set(preset.normalScale, preset.normalScale);
       material.needsUpdate = true;
     }
     invalidate();
-  }, [zoneMaterials, materials, invalidate]);
+  }, [zoneMaterials, materials, fabricSheen, fabricRelief, invalidate]);
 
   // Survol et sélection (CDC F-12).
   useEffect(() => {
@@ -185,8 +219,43 @@ function GarmentModel({
   );
 }
 
+/** Axe de rotation vertical et cercle au sol (Paramètres → Axe de rotation). */
+function RotationAxis({ y, color }: { y: number; color: string }) {
+  return (
+    <group>
+      <mesh position={[0, y + 0.55, 0]}>
+        <cylinderGeometry args={[0.0025, 0.0025, 1.1, 8]} />
+        <meshBasicMaterial color={color} transparent opacity={0.8} />
+      </mesh>
+      <mesh position={[0, y + 0.004, 0]} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[0.44, 0.447, 96]} />
+        <meshBasicMaterial color={color} transparent opacity={0.85} />
+      </mesh>
+    </group>
+  );
+}
+
 /** Podium lumineux de la maquette : disque sombre, anneau émissif et halo au sol. */
-function Podium() {
+/** Exposition et intensité de l'environnement, réglables sans recréer le contexte. */
+function RenderTone({
+  exposure,
+  environmentIntensity,
+}: {
+  exposure: number;
+  environmentIntensity: number;
+}) {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    gl.toneMappingExposure = exposure;
+    scene.environmentIntensity = environmentIntensity;
+    invalidate();
+  }, [gl, scene, exposure, environmentIntensity, invalidate]);
+  return null;
+}
+
+function Podium({ reflect = false }: { reflect?: boolean }) {
   const glow = useMemo(() => createGlowTexture("#3b82f6"), []);
   useEffect(() => () => glow.dispose(), [glow]);
   return (
@@ -199,11 +268,11 @@ function Podium() {
       <mesh position={[0, 0.036, 0]} rotation-x={-Math.PI / 2} receiveShadow>
         <circleGeometry args={[0.515, 96]} />
         <meshPhysicalMaterial
-          color="#33447a"
-          metalness={0.55}
-          roughness={0.22}
+          color={reflect ? "#4a5c94" : "#33447a"}
+          metalness={reflect ? 1 : 0.55}
+          roughness={reflect ? 0.04 : 0.22}
           clearcoat={1}
-          clearcoatRoughness={0.1}
+          clearcoatRoughness={reflect ? 0.02 : 0.1}
         />
       </mesh>
       <mesh position={[0, 0.036, 0]} rotation-x={Math.PI / 2}>
@@ -304,6 +373,21 @@ function Bridge({
         if (!blob) throw new Error("Capture impossible");
         return blob;
       },
+      pick(clientX, clientY) {
+        const rect = gl.domElement.getBoundingClientRect();
+        const ndc = new THREE.Vector2(
+          ((clientX - rect.left) / rect.width) * 2 - 1,
+          -((clientY - rect.top) / rect.height) * 2 + 1,
+        );
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(ndc, camera);
+        const hits: SurfaceHit[] = [];
+        for (const i of ray.intersectObject(scene, true)) {
+          const zone = i.object.userData.zone as string | undefined;
+          if (zone && i.uv) hits.push({ zone, u: i.uv.x, v: i.uv.y });
+        }
+        return hits;
+      },
       snapshot(views) {
         const out: Record<string, string> = {};
         const podium = scene.getObjectByName("podium");
@@ -342,6 +426,17 @@ export const GarmentViewer = forwardRef<GarmentViewerHandle, GarmentViewerProps>
     const controls = useRef<CameraControls | null>(null);
     const api = useRef<GarmentViewerHandle | null>(null);
     const { tool = "select", interacting, onAzimuthChange } = props;
+    const antialias = props.antialias ?? true;
+    const shadows = props.shadows ?? true;
+    const scale = props.modelScale ?? 1;
+    const floorY = props.showPodium !== false ? -0.432 : -0.42;
+    const guide = props.guideColor ?? "#1f5eff";
+    const k = props.lightIntensity ?? 1;
+    const lightColor = props.lightColor ?? "#ffffff";
+    // Lumière principale sur un cercle autour du vêtement (0° = face, sens horaire vu de dessus).
+    const a = (((props.lightAngle ?? 330) % 360) * Math.PI) / 180;
+    const keyPos: [number, number, number] = [3 * Math.sin(a), 2, 3 * Math.cos(a)];
+    const fillPos: [number, number, number] = [-2.6 * Math.sin(a), 0.5, -2.6 * Math.cos(a)];
 
     useImperativeHandle(ref, () => ({
       setView: (view, animate) => api.current?.setView(view, animate),
@@ -352,6 +447,7 @@ export const GarmentViewer = forwardRef<GarmentViewerHandle, GarmentViewerProps>
         return api.current.capture(width);
       },
       snapshot: (views) => api.current?.snapshot(views) ?? {},
+      pick: (x, y) => api.current?.pick(x, y) ?? [],
     }));
 
     useEffect(() => {
@@ -372,11 +468,12 @@ export const GarmentViewer = forwardRef<GarmentViewerHandle, GarmentViewerProps>
 
     return (
       <Canvas
+        key={antialias ? "aa" : "no-aa"}
         className={props.className}
         frameloop="demand"
-        dpr={[1, 2]}
-        shadows
-        gl={{ antialias: true, alpha: true, preserveDrawingBuffer: false }}
+        dpr={props.dpr ?? [1, 2]}
+        shadows={shadows}
+        gl={{ antialias, alpha: true, preserveDrawingBuffer: false }}
         camera={{ position: front.position, fov: 30, near: 0.05, far: 20 }}
         onPointerMissed={() => props.onMissed?.()}
         onCreated={({ gl }) => {
@@ -386,21 +483,36 @@ export const GarmentViewer = forwardRef<GarmentViewerHandle, GarmentViewerProps>
         }}
       >
         <LightingEnvironment preset={props.lighting ?? "studio"} />
-        <hemisphereLight args={["#ffffff", "#b9c3d6", 0.6]} />
-        <directionalLight position={[-1.5, 2, 2.5]} intensity={1.2} castShadow />
-        <directionalLight position={[2, 0.5, -2]} intensity={0.6} />
-        <Suspense fallback={null}>
-          <GarmentModel {...props} />
-        </Suspense>
-        {props.showPodium !== false && <Podium />}
-        <ContactShadows
-          position={[0, props.showPodium !== false ? -0.432 : -0.42, 0]}
-          opacity={0.45}
-          scale={1.2}
-          blur={2.2}
-          far={0.8}
-          frames={1}
+        <RenderTone exposure={props.exposure ?? 1} environmentIntensity={k} />
+        <hemisphereLight args={[lightColor, "#b9c3d6", 0.6 * k]} />
+        <directionalLight
+          position={keyPos}
+          intensity={1.2 * k}
+          color={lightColor}
+          castShadow={shadows}
         />
+        <directionalLight position={fillPos} intensity={0.6 * k} color={lightColor} />
+        <Suspense fallback={null}>
+          {/* Mise à l'échelle autour du sol : le vêtement reste posé sur le podium. */}
+          <group position={[0, floorY * (1 - scale), 0]} scale={scale}>
+            <GarmentModel {...props} />
+          </group>
+        </Suspense>
+        {props.showGrid && (
+          <gridHelper args={[2.4, 24, guide, "#9fb0d6"]} position={[0, floorY + 0.002, 0]} />
+        )}
+        {props.showAxes && <RotationAxis y={floorY} color={guide} />}
+        {props.showPodium !== false && <Podium reflect={props.podiumReflect} />}
+        {shadows && props.groundShadow !== false && (
+          <ContactShadows
+            position={[0, floorY, 0]}
+            opacity={0.45}
+            scale={1.2}
+            blur={2.2}
+            far={0.8}
+            frames={1}
+          />
+        )}
         <CameraControls
           ref={controls}
           makeDefault

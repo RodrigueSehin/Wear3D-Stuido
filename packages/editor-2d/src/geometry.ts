@@ -46,8 +46,12 @@ export function naturalSizePx(
 ): { w: number; h: number } {
   const w = layer.transform.w * zonePx.w;
   switch (layer.type) {
-    case "text":
-      return { w, h: layer.text.size * zonePx.h * 1.15 };
+    case "text": {
+      // Texte multi-ligne : chaque ligne ajoute une hauteur de ligne × interligne.
+      const lines = Math.max(1, layer.text.value.split("\n").length);
+      const lineH = layer.text.size * zonePx.h * 1.15;
+      return { w, h: lineH + (lines - 1) * lineH * layer.text.lineHeight };
+    }
     case "number":
       return { w, h: numberFontPx(w) };
     case "image": {
