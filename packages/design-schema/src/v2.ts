@@ -209,6 +209,37 @@ export const mockupSchema = z.object({
   saturation: z.number().min(-1).max(1).default(0),
 });
 
+/** Bords de manche : bande de finition, éventuellement rayée. */
+export const cuffTrimSchema = z.object({
+  enabled: z.boolean().default(true),
+  color: hexColorSchema,
+  /** Hauteur, en fraction de la hauteur de la zone de manche. */
+  width: z.number().min(0.03).max(0.5).default(0.12),
+  /** Rayures dans le bord (0 à 3). */
+  stripes: z.number().int().min(0).max(3).default(0),
+  stripeColor: hexColorSchema.default("#FFFFFF"),
+});
+
+export const GRAINLINES = ["vertical", "horizontal", "bias"] as const;
+
+/** Réglages de fabrication d'une pièce du patron (menu « Patron »). */
+export const sewingPieceSchema = z.object({
+  /** Marge de couture, en cm. */
+  seam: z.number().min(0).max(5).default(1),
+  /** Nombre de coupes (2 = pièce coupée deux fois, la seconde en miroir). */
+  cut: z.number().int().min(1).max(4).optional(),
+  grain: z.enum(GRAINLINES).default("vertical"),
+  comment: z.string().max(200).default(""),
+  hidden: z.boolean().default(false),
+});
+
+/** Patron de couture : laize du tissu et réglages par pièce. */
+export const sewingSchema = z.object({
+  /** Largeur utile du tissu (laize), en cm, pour le plan de coupe. */
+  fabricWidth: z.number().min(60).max(320).default(150),
+  pieces: z.record(z.string(), sewingPieceSchema).default({}),
+});
+
 export const AMBIANCES = ["day", "evening", "night"] as const;
 
 /**
@@ -245,6 +276,9 @@ export const designDocumentV2Schema = z.object({
   layers: z.array(layerSchema).max(200),
   scene: sceneSchema.optional(),
   mockup: mockupSchema.optional(),
+  sewing: sewingSchema.optional(),
+  /** Finitions (bords de manche…) des modèles qui en ont. */
+  trims: z.object({ cuffs: cuffTrimSchema.optional() }).optional(),
 });
 
 export type Pattern = z.infer<typeof patternSchema>;
@@ -256,6 +290,10 @@ export type ImageLayer = z.infer<typeof imageLayerSchema>;
 export type Layer = z.infer<typeof layerSchema>;
 export type Scene = z.infer<typeof sceneSchema>;
 export type Mockup = z.infer<typeof mockupSchema>;
+export type Sewing = z.infer<typeof sewingSchema>;
+export type CuffTrim = z.infer<typeof cuffTrimSchema>;
+export type SewingPiece = z.infer<typeof sewingPieceSchema>;
+export type Grainline = (typeof GRAINLINES)[number];
 export type Ambiance = (typeof AMBIANCES)[number];
 export type LayerType = Layer["type"];
 export type DesignDocumentV2 = z.infer<typeof designDocumentV2Schema>;

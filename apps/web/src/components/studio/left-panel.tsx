@@ -18,6 +18,7 @@ import { useStudio, type LibraryTab, type RailItem } from "@/lib/studio/store";
 import { fabricSwatch } from "@/lib/studio/swatches";
 import { ColorPickerPanel, PanelCard, PanelTitle, SelectBox } from "./controls";
 import { JerseyThumb } from "./jersey-thumb";
+import { CuffControls } from "./cuff-controls";
 import { ElementsPanel } from "./elements-panel";
 import { LogosPanel } from "./logos-panel";
 import { MockupsPanel } from "./mockups-panel";
@@ -34,6 +35,7 @@ const TITLES: Record<RailItem, string> = {
   elements: "Éléments",
   mockups: "Maquettes",
   scenes: "Scènes",
+  pattern: "Patron",
   settings: "Paramètres",
 };
 
@@ -378,6 +380,11 @@ function ColorsTab() {
       >
         Appliquer à toutes les zones
       </button>
+      {definition?.trims?.cuffs && (
+        <div className="border-border border-t pt-4">
+          <CuffControls />
+        </div>
+      )}
     </div>
   );
 }

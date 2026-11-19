@@ -42,6 +42,9 @@ export function composeInto(
     resolveFont,
     resolveNumberFont,
     background: doc.zones[zones[0]?.code ?? ""]?.color,
+    ...(definition.trims?.cuffs
+      ? { cuffs: { zones: definition.trims.cuffs.zones, edge: definition.trims.cuffs.edge } }
+      : {}),
     createCanvas: (w, h) => {
       const c = document.createElement("canvas");
       c.width = w;

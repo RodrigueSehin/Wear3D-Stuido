@@ -32,6 +32,7 @@ import { unitScale, useSettings } from "@/lib/studio/settings";
 import { patternZones, useSelectedLayer, useStudio } from "@/lib/studio/store";
 import { ColorField, NumberBox, PanelCard, PanelTitle, Section, SelectBox } from "./controls";
 import { MockupInspector } from "./mockups-panel";
+import { PieceInspector } from "./pattern-panels";
 import { SceneInspector } from "./scenes-panel";
 import { SettingsInspector } from "./settings-panel";
 
@@ -60,6 +61,29 @@ export function Inspector() {
   const sceneMode = sceneRail || (!mockupRail && selection?.kind === "scene");
   // Rail « Maquettes » ouvert, ou ligne « Maquette » sélectionnée.
   const mockupMode = !sceneMode && (mockupRail || selection?.kind === "mockup");
+  // Vue Patron : l'inspecteur décrit la pièce sélectionnée (dimensions, coupe, tissu).
+  const patternMode = useStudio((s) => s.viewMode === "pattern");
+  if (patternMode) {
+    return (
+      <PanelCard className="w-[300px] shrink-0">
+        <PanelTitle
+          action={
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="hover:bg-surface-muted rounded-md p-1"
+              aria-label="Replier l'inspecteur"
+            >
+              <ChevronsRight className="size-5" aria-hidden />
+            </button>
+          }
+        >
+          Inspecteur
+        </PanelTitle>
+        <PieceInspector />
+      </PanelCard>
+    );
+  }
   return (
     <PanelCard className="w-[300px] shrink-0">
       <PanelTitle

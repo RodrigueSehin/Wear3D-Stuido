@@ -35,6 +35,8 @@ export interface ComposeOptions {
   resolveNumberFont: (style: string) => string;
   /** Couleur hors des zones (bords d'îles). */
   background?: string;
+  /** Bords de manche du modèle (bande au poignet). */
+  cuffs?: { zones: readonly string[]; edge: "top" | "bottom" };
   /** Crée un canvas de travail (contours d'images). Absent = contour d'image ignoré. */
   createCanvas?: (w: number, h: number) => HTMLCanvasElement | OffscreenCanvas;
 }
@@ -68,6 +70,15 @@ export function composeAtlas(ctx: Ctx2D, doc: DesignDocument, opts: ComposeOptio
     if (style?.pattern) drawPattern(ctx, style.pattern, px, opts);
   }
 
+  // Bords de manche : bande de finition au poignet, au-dessus du motif, sous les calques.
+  const cuff = doc.trims?.cuffs;
+  if (cuff?.enabled && opts.cuffs) {
+    for (const code of opts.cuffs.zones) {
+      const px = rects.get(code);
+      if (px) drawCuff(ctx, px, cuff, opts.cuffs.edge);
+    }
+  }
+
   for (const layer of doc.layers) {
     if (!layer.visible) continue;
     const px = rects.get(layer.zone);
@@ -82,6 +93,31 @@ export function composeAtlas(ctx: Ctx2D, doc: DesignDocument, opts: ComposeOptio
     ctx.rotate((layer.transform.rotation * Math.PI) / 180);
     drawLayer(ctx, layer, px, opts);
     ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawCuff(
+  ctx: Ctx2D,
+  px: PxRect,
+  cuff: NonNullable<NonNullable<DesignDocument["trims"]>["cuffs"]>,
+  edge: "top" | "bottom",
+): void {
+  const h = cuff.width * px.h;
+  // Déborde de la zone (comme la couleur de fond) pour éviter tout liseré au filtrage.
+  const y = edge === "bottom" ? px.y + px.h - h : px.y - 4;
+  ctx.save();
+  ctx.fillStyle = cuff.color;
+  ctx.fillRect(px.x - 4, y, px.w + 8, h + 4);
+  if (cuff.stripes > 0) {
+    // Rayures fines régulièrement espacées dans la bande.
+    const sh = Math.max(2, h * 0.12);
+    ctx.fillStyle = cuff.stripeColor;
+    for (let i = 1; i <= cuff.stripes; i++) {
+      const sy =
+        (edge === "bottom" ? px.y + px.h - h : px.y) + (h * i) / (cuff.stripes + 1) - sh / 2;
+      ctx.fillRect(px.x - 4, sy, px.w + 8, sh);
+    }
   }
   ctx.restore();
 }

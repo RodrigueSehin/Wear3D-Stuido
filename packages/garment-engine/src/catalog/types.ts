@@ -21,6 +21,18 @@ export interface GarmentZoneDef {
   defaults: { color: string; material: MaterialCode };
 }
 
+/** Bords de manche (bande de finition au bas des manches), si le modèle en a. */
+export interface CuffTrimDef {
+  /** Zones de manche portant le bord. */
+  zones: readonly string[];
+  /** Bord de la zone UV situé au poignet. */
+  edge: "top" | "bottom";
+  /** Hauteur par défaut, en fraction de la hauteur de la zone. */
+  defaultWidth: number;
+  /** Longueur de manche (cm, taille M) : convertit la hauteur en cm. */
+  sleeveLengthCm: number;
+}
+
 export interface GarmentDefinition {
   reference: string;
   /** Identifiant de version du modèle 3D référencé par les designs. */
@@ -31,4 +43,6 @@ export interface GarmentDefinition {
   sizes: readonly string[];
   materials: readonly MaterialCode[];
   zones: readonly GarmentZoneDef[];
+  /** Finitions modifiables (absentes = le modèle n'en a pas). */
+  trims?: { cuffs?: CuffTrimDef };
 }

@@ -253,6 +253,106 @@ export const ELEMENTS: readonly ElementDef[] = [
       },
     ).join("")}</g>`,
   ),
+  G("pentagon", "Pentagone", fillPoly(poly(50, 54, 46, 5))),
+  G("octagon", "Octogone", fillPoly(poly(50, 50, 46, 8, 22.5))),
+  G("half-circle", "Demi-cercle", `<path d="M4 72 A46 46 0 0 1 96 72 Z" fill="${C}"/>`),
+  G("parallelogram", "Parallélogramme", fillPoly("28,20 96,20 72,80 4,80")),
+  D(
+    "speed-lines",
+    "Vitesse",
+    `<g fill="${C}">${(
+      [
+        [10, 80],
+        [26, 60],
+        [42, 88],
+        [58, 50],
+        [74, 70],
+      ] as const
+    )
+      .map(([y, w]) => `<rect x="${96 - w}" y="${y}" width="${w}" height="8" rx="4"/>`)
+      .join("")}</g>`,
+  ),
+  D(
+    "halftone",
+    "Trame",
+    Array.from({ length: 6 }, (_, i) =>
+      Array.from(
+        { length: 6 },
+        (_, j) =>
+          `<circle cx="${8 + i * 17}" cy="${8 + j * 17}" r="${(1.2 + i * 1.3).toFixed(1)}" fill="${C}"/>`,
+      ).join(""),
+    ).join(""),
+  ),
+  D(
+    "checker",
+    "Damier",
+    Array.from({ length: 5 }, (_, i) =>
+      Array.from({ length: 5 }, (_, j) =>
+        (i + j) % 2 ? "" : `<rect x="${i * 20}" y="${j * 20}" width="20" height="20" fill="${C}"/>`,
+      ).join(""),
+    ).join(""),
+  ),
+  D(
+    "rays",
+    "Rayons",
+    Array.from({ length: 12 }, (_, k) => {
+      const a = (k * Math.PI) / 6;
+      const b = a + Math.PI / 14;
+      return `<polygon points="50,50 ${(50 + 70 * Math.cos(a)).toFixed(1)},${(50 + 70 * Math.sin(a)).toFixed(1)} ${(50 + 70 * Math.cos(b)).toFixed(1)},${(50 + 70 * Math.sin(b)).toFixed(1)}" fill="${C}"/>`;
+    }).join(""),
+  ),
+  DEC(
+    "medal",
+    "Médaille",
+    `<path d="M30 4 L46 40 L38 44 L22 8Z M70 4 L54 40 L62 44 L78 8Z" fill="${C}"/><circle cx="50" cy="64" r="28" fill="${C}"/>`,
+  ),
+  DEC("starburst", "Éclat", fillPoly(poly(50, 50, 48, 12, -90, 0.72))),
+  DEC(
+    "shield-outline",
+    "Bouclier vide",
+    `<path d="M50 6 L88 18 V50 C88 72 71 88 50 95 C29 88 12 72 12 50 V18 Z" fill="none" stroke="${C}" stroke-width="8" stroke-linejoin="round"/>`,
+  ),
+  el(
+    "sports",
+    "icons",
+    "tennis",
+    "Tennis",
+    `<circle cx="50" cy="50" r="44" fill="#D4E157" stroke="#9E9D24" stroke-width="2"/>` +
+      `<g fill="none" stroke="#FFFFFF" stroke-width="5"><path d="M14 22 C34 38 34 62 14 78"/><path d="M86 22 C66 38 66 62 86 78"/></g>`,
+    false,
+  ),
+  el(
+    "sports",
+    "icons",
+    "rugby",
+    "Rugby",
+    `<ellipse cx="50" cy="50" rx="46" ry="28" transform="rotate(-30 50 50)" fill="#8B4513" stroke="#5D2E0C" stroke-width="3"/>` +
+      `<g stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"><path d="M34 60 L66 40"/>${[
+        0, 1, 2, 3,
+      ]
+        .map((k) => {
+          const x = 40 + k * 7;
+          const y = 56 - k * 4.4;
+          return `<path d="M${(x - 3).toFixed(1)} ${(y - 5).toFixed(1)} L${(x + 3).toFixed(1)} ${(y + 5).toFixed(1)}"/>`;
+        })
+        .join("")}</g>`,
+    false,
+  ),
+  SYM(
+    "stopwatch",
+    "Chrono",
+    `<rect x="42" y="4" width="16" height="9" rx="2" fill="${C}"/><circle cx="50" cy="56" r="38" fill="none" stroke="${C}" stroke-width="9"/><path d="M50 56 L50 32" stroke="${C}" stroke-width="7" stroke-linecap="round"/><circle cx="50" cy="56" r="6" fill="${C}"/>`,
+  ),
+  SYM(
+    "pulse",
+    "Pulsation",
+    `<polyline points="4,54 26,54 34,30 46,80 58,18 68,54 96,54" fill="none" stroke="${C}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ),
+  SYM(
+    "infinity",
+    "Infini",
+    `<path d="M50 50 C38 30 12 30 12 50 C12 70 38 70 50 50 C62 30 88 30 88 50 C88 70 62 70 50 50Z" fill="none" stroke="${C}" stroke-width="9"/>`,
+  ),
 ];
 
 export function elementByAssetId(assetId: string): ElementDef | undefined {

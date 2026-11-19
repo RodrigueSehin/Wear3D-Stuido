@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@wear3d/ui";
@@ -28,6 +29,7 @@ import {
   Lock,
   LockOpen,
   MoreHorizontal,
+  MoveRight,
   Plus,
   Shapes,
   Trash2,
@@ -41,7 +43,9 @@ import { patternPreview } from "@/lib/studio/patterns";
 import { useSceneBackdrop } from "@/lib/studio/scene-backdrop";
 import { effectiveColors, MOCKUPS } from "@/lib/studio/mockups";
 import { sceneById } from "@/lib/studio/scenes";
+import { moveLayerToZone, zoneAccepts } from "@/lib/studio/interaction";
 import { placementZone, revealZone } from "@/lib/studio/placement";
+import { PatternLayers } from "./pattern-panels";
 import { contrastColor } from "@/lib/studio/textures";
 import { patternZones, useStudio } from "@/lib/studio/store";
 import { PanelCard, PanelTitle } from "./controls";
@@ -85,6 +89,9 @@ function Thumb({ layer }: { layer: Layer }) {
 }
 
 function RowMenu({ layer }: { layer: Layer }) {
+  const zones = useStudio((st) => st.definition?.zones ?? []);
+  // Zones qui acceptent ce calque, hors sa zone actuelle (devant, dos, manches, col).
+  const targets = zones.filter((z) => z.code !== layer.zone && zoneAccepts(z.code, layer));
   const { duplicateLayer, removeLayer, reorderLayer, updateLayer, seal } = useStudio.getState();
   return (
     <DropdownMenu>
@@ -107,6 +114,17 @@ function RowMenu({ layer }: { layer: Layer }) {
         <DropdownMenuItem onSelect={() => reorderLayer(layer.id, "down")}>
           <ArrowDown /> Descendre
         </DropdownMenuItem>
+        {targets.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Déplacer vers</DropdownMenuLabel>
+            {targets.map((z) => (
+              <DropdownMenuItem key={z.code} onSelect={() => moveLayerToZone(layer.id, z.code)}>
+                <MoveRight /> {z.label}
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
         <DropdownMenuItem
           onSelect={() => {
             seal();
@@ -128,7 +146,13 @@ function RowMenu({ layer }: { layer: Layer }) {
 const row = "group flex h-[54px] items-center gap-2 rounded-xl px-2 transition";
 
 /** Panneau Calques (maquette Studio) : ordre par glisser-déposer, visibilité, actions. */
+/** Calques : ceux du design, ou les pièces en vue Patron. */
 export function LayersPanel() {
+  const patternMode = useStudio((s) => s.viewMode === "pattern");
+  return patternMode ? <PatternLayers /> : <DesignLayersPanel />;
+}
+
+function DesignLayersPanel() {
   // Rafraîchit les vignettes quand les images finissent de charger (l'atlas est recomposé).
   useAtlas((s) => s.version);
   const doc = useStudio((s) => s.doc);

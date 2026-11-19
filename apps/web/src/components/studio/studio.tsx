@@ -37,6 +37,7 @@ export function Studio({
   const libraryOpen = useStudio((s) => s.libraryOpen);
   const inspectorOpen = useStudio((s) => s.inspectorOpen);
   const preview = useStudio((s) => s.preview);
+  const viewMode = useStudio((s) => s.viewMode);
   const ready = loadedId === designId && hasDoc;
   const theme = useSettings((st) => st.theme);
   const accent = useSettings((st) => st.accent);
@@ -225,7 +226,7 @@ export function Studio({
             >
               <div className="flex min-w-0 flex-1 flex-col gap-3">
                 <div className="flex min-h-0 flex-1 gap-3">
-                  {libraryOpen && !preview && <LeftPanel />}
+                  {libraryOpen && !preview && viewMode !== "pattern" && <LeftPanel />}
                   <Stage />
                   {!preview && (
                     <div className="hidden 2xl:flex">
@@ -233,7 +234,7 @@ export function Studio({
                     </div>
                   )}
                 </div>
-                {!preview && <BottomBar />}
+                {!preview && viewMode !== "pattern" && <BottomBar />}
               </div>
               {!preview &&
                 (inspectorOpen ? (

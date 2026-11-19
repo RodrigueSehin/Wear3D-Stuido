@@ -15,11 +15,22 @@ import { SnapshotHistory } from "@wear3d/editor-2d";
 import type { GarmentDefinition, LightingPreset, ViewPreset } from "@wear3d/garment-engine";
 import { create } from "zustand";
 import type { FlatMode } from "./flat-layout";
+import type { PatternSide, PatternTab, PatternUnit } from "./sewing";
 import { withMockup } from "./mockups";
 
 /** Entrées du rail gauche (maquette Studio). */
 export type RailItem =
-  "design" | "textures" | "logos" | "texts" | "elements" | "mockups" | "scenes" | "settings";
+  | "design"
+  | "textures"
+  | "logos"
+  | "texts"
+  | "elements"
+  | "mockups"
+  | "scenes"
+  | "pattern"
+  | "settings";
+/** Vue centrale : 3D, 2D à plat, ou patron de couture avec aperçu 3D. */
+export type ViewMode = "3d" | "2d" | "pattern";
 export type LibraryTab = "models" | "colors" | "patterns" | "fabrics";
 export type ViewerTool = "select" | "move" | "pan" | "orbit";
 export type SaveState = "idle" | "saving" | "saved" | "offline" | "error";
@@ -52,7 +63,12 @@ interface StudioState {
   libraryOpen: boolean;
   libraryTab: LibraryTab;
   inspectorOpen: boolean;
-  viewMode: "3d" | "2d";
+  viewMode: ViewMode;
+  /** Vue Patron : onglet, unité, face du tissu et pièce sélectionnée. */
+  patternTab: PatternTab;
+  patternUnit: PatternUnit;
+  patternSide: PatternSide;
+  selectedPiece: string | null;
   tool: ViewerTool;
   preview: boolean;
   lighting: LightingPreset;
@@ -107,7 +123,11 @@ interface StudioState {
   setLibraryOpen(open: boolean): void;
   setLibraryTab(tab: LibraryTab): void;
   setInspectorOpen(open: boolean): void;
-  setViewMode(mode: "3d" | "2d"): void;
+  setViewMode(mode: ViewMode): void;
+  setPatternTab(tab: PatternTab): void;
+  setPatternUnit(unit: PatternUnit): void;
+  setPatternSide(side: PatternSide): void;
+  selectPiece(id: string | null): void;
   setTool(tool: ViewerTool): void;
   setPreview(preview: boolean): void;
   setLighting(lighting: LightingPreset): void;
@@ -151,6 +171,10 @@ export const useStudio = create<StudioState>()((set, get) => ({
   libraryTab: "models",
   inspectorOpen: true,
   viewMode: "3d",
+  patternTab: "pattern",
+  patternUnit: "cm",
+  patternSide: "front",
+  selectedPiece: "front",
   tool: "select",
   preview: false,
   lighting: "studio",
@@ -347,6 +371,12 @@ export const useStudio = create<StudioState>()((set, get) => ({
     set((s) => ({
       rail: item,
       libraryOpen: s.rail === item ? !s.libraryOpen : true,
+      // « Patron » ouvre la vue patron ; un autre outil ramène à la 3D.
+      ...(item === "pattern"
+        ? { viewMode: "pattern" as const }
+        : s.viewMode === "pattern"
+          ? { viewMode: "3d" as const }
+          : {}),
       ...(item === "design" && s.rail !== "design" ? { libraryTab: "models" as const } : {}),
       ...(item === "textures" ? { libraryTab: "fabrics" as const } : {}),
     }));
@@ -361,7 +391,26 @@ export const useStudio = create<StudioState>()((set, get) => ({
     set({ inspectorOpen });
   },
   setViewMode(viewMode) {
-    set({ viewMode });
+    set((s) => ({
+      viewMode,
+      ...(viewMode === "pattern"
+        ? { rail: "pattern" as const }
+        : s.rail === "pattern"
+          ? { rail: "design" as const }
+          : {}),
+    }));
+  },
+  setPatternTab(patternTab) {
+    set({ patternTab });
+  },
+  setPatternUnit(patternUnit) {
+    set({ patternUnit });
+  },
+  setPatternSide(patternSide) {
+    set({ patternSide });
+  },
+  selectPiece(selectedPiece) {
+    set({ selectedPiece });
   },
   setTool(tool) {
     set({ tool });

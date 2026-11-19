@@ -406,7 +406,9 @@ export function FlatView() {
                 return uv ? [uv] : [];
               }),
             );
-            surfaceMove(hits);
+            // Zone réellement sous le pointeur : un calque glissé dessus y est transféré.
+            const over = hit ? placementToUv(hit.p, definition, hit.ux, hit.uy) : null;
+            surfaceMove(hits, over);
           }}
           onPointerUp={() => {
             panning.current = null;
