@@ -1,12 +1,26 @@
 "use client";
 
-import { createEmptyDocument } from "@wear3d/design-schema";
-import { getGarmentByReference, getGarmentByVersion, TSHIRT_CLASSIC } from "@wear3d/garment-engine";
+import { createEmptyDocument, type DesignDocument } from "@wear3d/design-schema";
+import {
+  getGarmentByReference,
+  getGarmentByVersion,
+  TSHIRT_CLASSIC,
+  type GarmentDefinition,
+} from "@wear3d/garment-engine";
 import { cn } from "@wear3d/ui";
 import { ChevronsLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { STUDIO_FONTS } from "@/lib/studio/fonts";
+import {
+  cloud,
+  createOnline,
+  currentUserId,
+  importDraft,
+  isCloudId,
+  openOnline,
+  pushToCloud,
+} from "@/lib/studio/cloud-session";
 import { loadDesign, saveDesign } from "@/lib/studio/persistence";
 import { accentVars, useSettings } from "@/lib/studio/settings";
 import { selectedLayerId, useStudio } from "@/lib/studio/store";
@@ -23,6 +37,7 @@ import { TopBar } from "./top-bar";
 
 /** Délai d'autosave : bien en dessous des 5 s exigées (CDC F-16, REC-08). */
 const AUTOSAVE_DELAY_MS = 800;
+const CLOUD_SAVE_DELAY_MS = 3000;
 
 export function Studio({
   designId,
@@ -59,34 +74,88 @@ export function Studio({
     if (ready) applyDefaultView(useSettings.getState().defaultView);
   }, [ready, designId]);
 
-  // Chargement ou création du brouillon local.
+  // Chargement : en ligne pour un utilisateur connecté, sinon brouillon local.
   useEffect(() => {
-    if (designId === "nouveau") {
-      const id = `d_${crypto.randomUUID()}`;
-      const query = modelReference ? `?modele=${encodeURIComponent(modelReference)}` : "";
-      router.replace(`/studio/${id}${query}`);
-      return;
-    }
     let cancelled = false;
+    const query = modelReference ? `?modele=${encodeURIComponent(modelReference)}` : "";
+    const newDefinition = () =>
+      (modelReference && getGarmentByReference(modelReference)) || TSHIRT_CLASSIC;
+    const initLocal = (definition: GarmentDefinition, doc: DesignDocument, name: string) => {
+      cloud.active = false;
+      useStudio.getState().init({ designId, name, definition, doc });
+    };
     void (async () => {
       try {
+        const userId = await currentUserId();
+        if (cancelled) return;
+
+        if (designId === "nouveau") {
+          if (userId) {
+            try {
+              const created = await createOnline(userId, "Mon design", newDefinition());
+              if (!cancelled) router.replace(`/studio/${created.id}${query}`);
+              return;
+            } catch {
+              // Catalogue ou espace indisponible : on retombe sur un brouillon local.
+            }
+          }
+          if (!cancelled) router.replace(`/studio/d_${crypto.randomUUID()}${query}`);
+          return;
+        }
+
+        // Design en ligne ; copie locale en secours si le réseau est coupé.
+        if (isCloudId(designId)) {
+          let row = null;
+          try {
+            row = await openOnline(designId);
+          } catch {
+            const local = await loadDesign(designId);
+            const definition = local && getGarmentByVersion(local.document.model.versionId);
+            if (local && definition && !cancelled) {
+              cloud.active = true;
+              initLocal(definition, local.document, local.name);
+              cloud.active = true;
+              useStudio.getState().setSaveState("offline");
+              return;
+            }
+            throw new Error("Impossible de charger ce design (hors ligne ?)");
+          }
+          if (cancelled) return;
+          if (!row) throw new Error("Design introuvable ou supprimé");
+          const definition = getGarmentByVersion(row.document.model.versionId);
+          if (!definition) throw new Error("Modèle 3D introuvable pour ce design");
+          cloud.active = true;
+          useStudio.getState().init({ designId, name: row.name, definition, doc: row.document });
+          return;
+        }
+
+        // Brouillon local ; connecté, il est repris en ligne.
         const stored = await loadDesign(designId);
         if (cancelled) return;
         if (stored) {
           const definition = getGarmentByVersion(stored.document.model.versionId);
           if (!definition) throw new Error("Modèle 3D introuvable pour ce design");
-          useStudio
-            .getState()
-            .init({ designId, name: stored.name, definition, doc: stored.document });
+          if (userId) {
+            try {
+              const created = await importDraft(userId, stored, definition);
+              if (!cancelled) router.replace(`/studio/${created.id}`);
+              return;
+            } catch {
+              // Reste en local : rien n'est perdu.
+            }
+          }
+          initLocal(definition, stored.document, stored.name);
           return;
         }
-        const definition =
-          (modelReference && getGarmentByReference(modelReference)) || TSHIRT_CLASSIC;
-        const doc = createEmptyDocument(
-          definition.versionId,
-          definition.zones.map((z) => ({ code: z.code, ...z.defaults })),
+        const definition = newDefinition();
+        initLocal(
+          definition,
+          createEmptyDocument(
+            definition.versionId,
+            definition.zones.map((z) => ({ code: z.code, ...z.defaults })),
+          ),
+          "Mon design",
         );
-        useStudio.getState().init({ designId, name: "Mon design", definition, doc });
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Chargement impossible");
       }
@@ -109,10 +178,24 @@ export function Studio({
           document: s.doc,
           updatedAt: new Date().toISOString(),
         });
-        s.setSaveState(navigator.onLine ? "saved" : "offline");
+        if (cloud.active) scheduleCloud();
+        else s.setSaveState(navigator.onLine ? "saved" : "offline");
       } catch {
         s.setSaveState("error");
       }
+    };
+    // En ligne : au plus une écriture serveur toutes les 3 s (la copie locale reste immédiate).
+    let cloudTimer: ReturnType<typeof setTimeout> | undefined;
+    const cloudFlush = async () => {
+      cloudTimer = undefined;
+      const s = useStudio.getState();
+      if (!cloud.active || s.conflict) return;
+      const r = await pushToCloud();
+      if (r === "conflict") s.setConflict(true);
+      else s.setSaveState(r);
+    };
+    const scheduleCloud = () => {
+      cloudTimer ??= setTimeout(() => void cloudFlush(), CLOUD_SAVE_DELAY_MS);
     };
     const unsubscribe = useStudio.subscribe((state, prev) => {
       if (state.revision === prev.revision || state.revision === 0) return;
@@ -123,7 +206,10 @@ export function Studio({
     const onHide = () => {
       if (document.visibilityState === "hidden" && useStudio.getState().saveState === "saving") {
         clearTimeout(timer);
-        void flush();
+        void flush().then(() => {
+          clearTimeout(cloudTimer);
+          if (cloud.active) void cloudFlush();
+        });
       }
     };
     const onOffline = () => useStudio.getState().setSaveState("offline");
@@ -132,6 +218,7 @@ export function Studio({
     return () => {
       unsubscribe();
       clearTimeout(timer);
+      clearTimeout(cloudTimer);
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("offline", onOffline);
     };

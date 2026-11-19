@@ -14,7 +14,14 @@ import {
   Unlink,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AssetImportError, ensureImage, importImage, MAX_UPLOAD_BYTES } from "@/lib/studio/assets";
+import {
+  AssetImportError,
+  deleteImage,
+  ensureImage,
+  importImage,
+  listAllAssets,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/studio/assets";
 import {
   effectiveColors,
   filterMockups,
@@ -28,7 +35,7 @@ import {
   type MockupCategory,
   type MockupTemplate,
 } from "@/lib/studio/mockups";
-import { deleteAsset, listAssets, type StoredAsset } from "@/lib/studio/persistence";
+import { type StoredAsset } from "@/lib/studio/persistence";
 import { draggable, type DragPayload } from "@/lib/studio/placement";
 import { useStudio } from "@/lib/studio/store";
 import { ColorField, NumberBox, PercentSlider, SelectBox } from "./controls";
@@ -50,7 +57,7 @@ function useImportedMockups() {
   const [items, setItems] = useState<StoredAsset[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const refresh = useCallback(async () => {
-    const list = (await listAssets().catch(() => [])).filter((a) =>
+    const list = (await listAllAssets().catch(() => [])).filter((a) =>
       a.id.startsWith(MOCKUP_ASSET_PREFIX),
     );
     const entries = await Promise.all(
@@ -163,7 +170,7 @@ export function MockupsPanel() {
   }
 
   async function remove(a: StoredAsset) {
-    await deleteAsset(a.id);
+    await deleteImage(a.id);
     await imported.refresh();
   }
 

@@ -1,8 +1,22 @@
 {
   "reference": "FB-JERSEY",
   "versionId": "football-jersey@1",
-  "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
-  "materials": ["poly-sport", "polyester", "sport-mesh", "technical", "microfiber", "honeycomb"],
+  "sizes": [
+    "XS",
+    "S",
+    "M",
+    "L",
+    "XL",
+    "XXL"
+  ],
+  "materials": [
+    "poly-sport",
+    "polyester",
+    "sport-mesh",
+    "technical",
+    "microfiber",
+    "honeycomb"
+  ],
   "zones": [
     {
       "code": "BODY_FRONT",
@@ -18,7 +32,13 @@
         "w": 300,
         "h": 420
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "poly-sport"
@@ -38,7 +58,13 @@
         "w": 320,
         "h": 480
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "poly-sport"
@@ -58,7 +84,13 @@
         "w": 110,
         "h": 100
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "poly-sport"
@@ -78,7 +110,13 @@
         "w": 110,
         "h": 100
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "poly-sport"
@@ -94,7 +132,12 @@
         "w": 0.984375,
         "h": 0.06
       },
-      "allows": ["color", "material", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "poly-sport"

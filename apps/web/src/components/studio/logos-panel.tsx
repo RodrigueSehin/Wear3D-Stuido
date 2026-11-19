@@ -7,8 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ACCEPTED_TYPES,
   AssetImportError,
+  deleteImage,
   ensureImage,
   importImage,
+  listAllAssets,
   MAX_UPLOAD_BYTES,
 } from "@/lib/studio/assets";
 import {
@@ -20,7 +22,7 @@ import {
 } from "@/lib/studio/logos";
 import { MOCKUP_ASSET_PREFIX } from "@/lib/studio/mockups";
 import { PATTERN_PREFIX } from "@/lib/studio/patterns";
-import { deleteAsset, listAssets, type StoredAsset } from "@/lib/studio/persistence";
+import { type StoredAsset } from "@/lib/studio/persistence";
 import { draggable, placementZone, revealZone, type DragPayload } from "@/lib/studio/placement";
 import { useStudio } from "@/lib/studio/store";
 import { SelectBox } from "./controls";
@@ -54,7 +56,7 @@ export function LogosPanel() {
   const input = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
-    const list = (await listAssets()).filter(
+    const list = (await listAllAssets()).filter(
       (a) => !a.id.startsWith(PATTERN_PREFIX) && !a.id.startsWith(MOCKUP_ASSET_PREFIX),
     );
     const entries = await Promise.all(
@@ -100,7 +102,7 @@ export function LogosPanel() {
   }
 
   async function remove(a: StoredAsset) {
-    await deleteAsset(a.id);
+    await deleteImage(a.id);
     await refresh();
   }
 

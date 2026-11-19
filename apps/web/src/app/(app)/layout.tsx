@@ -1,7 +1,14 @@
-import { Bell, CircleHelp, Search } from "lucide-react";
+import { Bell, CircleHelp, LogOut, Search } from "lucide-react";
+import { isSupabaseConfigured } from "@/env";
+import { signOut } from "@/lib/auth/actions";
+import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app/app-sidebar";
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
+export default async function ClientLayout({ children }: { children: React.ReactNode }) {
+  const supabase = isSupabaseConfigured ? await createClient() : null;
+  const user = supabase ? (await supabase.auth.getUser()).data.user : null;
+  const name =
+    (user?.user_metadata?.first_name as string | undefined) ?? user?.email?.split("@")[0] ?? null;
   return (
     <div className="flex min-h-dvh">
       <AppSidebar />
@@ -33,6 +40,23 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           >
             <CircleHelp className="size-5" aria-hidden />
           </button>
+          {user && (
+            <form action={signOut} className="flex items-center gap-2">
+              <span
+                className="bg-action text-action-foreground grid size-8 place-items-center rounded-full text-sm font-semibold uppercase"
+                title={user.email ?? undefined}
+              >
+                {name?.[0] ?? "?"}
+              </span>
+              <button
+                type="submit"
+                className="hover:bg-surface-muted flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm"
+                aria-label="Se déconnecter"
+              >
+                <LogOut className="size-4" aria-hidden /> Déconnexion
+              </button>
+            </form>
+          )}
         </header>
         <main className="flex-1">{children}</main>
       </div>

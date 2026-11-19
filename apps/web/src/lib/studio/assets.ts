@@ -6,7 +6,7 @@
 import type { ImageSource } from "@wear3d/editor-2d";
 import { elementByAssetId, elementSvg } from "./elements";
 import { logoByAssetId, logoSvg } from "./logos";
-import { loadAsset, saveAsset, type StoredAsset } from "./persistence";
+import { deleteAsset, listAssets, loadAsset, saveAsset, type StoredAsset } from "./persistence";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/svg+xml"] as const;
@@ -99,7 +99,36 @@ export async function importImage(file: File, idPrefix = "asset_"): Promise<Stor
   };
   await saveAsset(asset);
   cache.set(asset.id, source);
+  // Copie en ligne (utilisateur connecté), sans bloquer ni faire échouer l'import.
+  void import("./cloud-assets").then((m) => m.uploadAsset(asset));
   return asset;
+}
+
+/** Supprime une image importée : navigateur et copie en ligne. */
+export async function deleteImage(id: string): Promise<void> {
+  await deleteAsset(id);
+  cache.delete(id);
+  void import("./cloud-assets").then((m) => m.removeCloudAsset(id));
+}
+
+/** Images locales, complétées par celles du compte absentes de ce navigateur. */
+export async function listAllAssets(): Promise<StoredAsset[]> {
+  const local = await listAssets().catch(() => [] as StoredAsset[]);
+  try {
+    const m = await import("./cloud-assets");
+    const known = new Set(local.map((a) => a.id));
+    for (const remote of await m.listCloudAssets()) {
+      if (known.has(remote.id)) continue;
+      const asset = await m.downloadAsset(remote.id);
+      if (asset) {
+        await saveAsset(asset);
+        local.push(asset);
+      }
+    }
+  } catch {
+    // Hors ligne ou non connecté : les images locales suffisent.
+  }
+  return local;
 }
 
 export function getCachedImage(assetId: string): ImageSource | undefined {
@@ -119,7 +148,15 @@ export function ensureImage(assetId: string): Promise<ImageSource | undefined> {
     p = (
       svg
         ? decode(new Blob([svg], { type: "image/svg+xml" }))
-        : loadAsset(assetId).then((asset) => (asset ? decode(asset.blob) : undefined))
+        : loadAsset(assetId)
+            .then(async (asset) => {
+              if (asset) return asset;
+              // Autre appareil : récupère l'image du compte puis la garde en local.
+              const remote = await import("./cloud-assets").then((m) => m.downloadAsset(assetId));
+              if (remote) await saveAsset(remote);
+              return remote;
+            })
+            .then((asset) => (asset ? decode(asset.blob) : undefined))
     )
       .then((src) => {
         if (src) cache.set(assetId, src);

@@ -2,6 +2,7 @@
 
 import { CloudOff, RefreshCw, TriangleAlert } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { cloud, openOnline, overwriteCloud, pushToCloud } from "@/lib/studio/cloud-session";
 import { loadDesign, onRemoteSave, saveDesign } from "@/lib/studio/persistence";
 import { useStudio } from "@/lib/studio/store";
 
@@ -47,7 +48,11 @@ export function StatusBanner() {
         document: s.doc,
         updatedAt: new Date().toISOString(),
       });
-      s.setSaveState("saved");
+      if (cloud.active) {
+        const r = await pushToCloud();
+        if (r === "conflict") s.setConflict(true);
+        else s.setSaveState(r);
+      } else s.setSaveState("saved");
     } catch {
       s.setSaveState("error");
     }
@@ -77,6 +82,17 @@ export function StatusBanner() {
   const reloadTheirs = async () => {
     const s = useStudio.getState();
     if (!s.designId || !s.definition) return;
+    if (cloud.active) {
+      const row = await openOnline(s.designId);
+      if (row)
+        s.init({
+          designId: s.designId,
+          name: row.name,
+          definition: s.definition,
+          doc: row.document,
+        });
+      return;
+    }
     const stored = await loadDesign(s.designId);
     if (stored)
       s.init({
@@ -88,6 +104,12 @@ export function StatusBanner() {
   };
   const keepMine = async () => {
     useStudio.getState().setConflict(false);
+    if (cloud.active) {
+      const r = await overwriteCloud();
+      if (r === "conflict") useStudio.getState().setConflict(true);
+      else useStudio.getState().setSaveState(r);
+      return;
+    }
     await saveNow();
   };
 
@@ -95,8 +117,8 @@ export function StatusBanner() {
     return (
       <Bar tone="blue" icon={<RefreshCw className="size-4 shrink-0" aria-hidden />}>
         <span className="flex-1">
-          Ce design a été modifié dans un autre onglet. L&apos;enregistrement automatique est en
-          pause.
+          Ce design a été modifié ailleurs (autre onglet ou appareil). L&apos;enregistrement
+          automatique est en pause.
         </span>
         <button type="button" className={btn} onClick={() => void reloadTheirs()}>
           Charger l&apos;autre version

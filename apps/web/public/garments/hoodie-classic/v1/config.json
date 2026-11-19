@@ -1,8 +1,22 @@
 {
   "reference": "HD-CLASSIC",
   "versionId": "hoodie-classic@1",
-  "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
-  "materials": ["cotton", "polyester", "elastane", "knit", "microfiber", "technical"],
+  "sizes": [
+    "XS",
+    "S",
+    "M",
+    "L",
+    "XL",
+    "XXL"
+  ],
+  "materials": [
+    "cotton",
+    "polyester",
+    "elastane",
+    "knit",
+    "microfiber",
+    "technical"
+  ],
   "zones": [
     {
       "code": "BODY_FRONT",
@@ -18,7 +32,13 @@
         "w": 320,
         "h": 380
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
@@ -38,7 +58,13 @@
         "w": 340,
         "h": 500
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
@@ -58,7 +84,13 @@
         "w": 110,
         "h": 400
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
@@ -78,7 +110,13 @@
         "w": 110,
         "h": 400
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
@@ -94,7 +132,12 @@
         "w": 0.984375,
         "h": 0.1
       },
-      "allows": ["color", "material", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
