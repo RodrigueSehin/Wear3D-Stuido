@@ -20,7 +20,19 @@ export function PageHero({
   showJerseys?: boolean;
 }) {
   return (
-    <section className="bg-hero relative overflow-hidden rounded-b-[2.5rem] text-white">
+    <section className="bg-brand-navy-950 relative overflow-hidden rounded-b-[2.5rem] text-white">
+      <Image
+        src="/hero/background.png"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover object-[75%_bottom]"
+      />
+      <div
+        aria-hidden
+        className="from-brand-navy-950 via-brand-navy-950/70 absolute inset-0 bg-gradient-to-r to-transparent"
+      />
       <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 pb-14 pt-4 sm:px-6 lg:grid-cols-[1.1fr_1fr]">
         <div>
           <Badge variant="outline" className="bg-brand-navy-800/60 border-white/25 text-white">
@@ -33,27 +45,28 @@ export function PageHero({
           {children && <div className="mt-6">{children}</div>}
         </div>
         {showJerseys && (
-          <div aria-hidden className="relative hidden h-64 lg:block">
+          <div aria-hidden className="relative hidden h-72 lg:block">
+            <div className="ring-brand-sky/60 absolute inset-x-4 bottom-0 h-16 rounded-[50%] ring-2 [box-shadow:0_0_40px_rgba(76,141,255,.45)]" />
             <Image
-              src="/hero/jersey-polo.png"
+              src="/vetements/polo-hd.webp"
               alt=""
-              width={220}
-              height={260}
-              className="absolute bottom-0 left-0 h-56 w-auto"
+              width={260}
+              height={240}
+              className="absolute bottom-3 left-0 h-52 w-auto drop-shadow-[0_18px_28px_rgb(0_10_50/0.55)]"
             />
             <Image
               src="/hero/jersey-football.png"
               alt=""
-              width={260}
-              height={300}
-              className="absolute bottom-0 left-1/2 h-64 w-auto -translate-x-1/2"
+              width={280}
+              height={330}
+              className="absolute bottom-3 left-1/2 z-10 h-72 w-auto -translate-x-1/2 drop-shadow-[0_18px_28px_rgb(0_10_50/0.55)]"
             />
             <Image
-              src="/hero/jersey-hoodie.png"
+              src="/vetements/hoodie-hd.webp"
               alt=""
-              width={220}
-              height={260}
-              className="absolute bottom-0 right-0 h-56 w-auto"
+              width={260}
+              height={240}
+              className="absolute bottom-3 right-0 h-52 w-auto drop-shadow-[0_18px_28px_rgb(0_10_50/0.55)]"
             />
           </div>
         )}

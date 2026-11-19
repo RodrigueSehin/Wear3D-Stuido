@@ -2,6 +2,7 @@ import { COMPARISON, PLAN_CARDS, PLAN_ORDER } from "@wear3d/billing";
 import { Button, cn } from "@wear3d/ui";
 import { ArrowRight, Check, ChevronDown, ShieldCheck, X, XCircle } from "lucide-react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { PageHero } from "@/components/marketing/page-hero";
 import { Pricing } from "@/components/marketing/pricing";
@@ -144,20 +145,29 @@ export default function Page() {
             ))}
           </div>
         </div>
-        <div className="bg-gradient-cta flex flex-col justify-center rounded-2xl p-8 text-white">
-          <h2 className="text-3xl font-extrabold">Prêt à commencer ?</h2>
-          <p className="mt-3 max-w-md text-white/85">
-            Lancez votre essai gratuit de 14 jours et concevez dès maintenant votre premier vêtement
-            en 3D.
-          </p>
-          <div className="mt-6">
-            <Button asChild size="lg">
-              <Link href="/inscription">
-                Essayer gratuitement 14 jours <ArrowRight aria-hidden />
-              </Link>
-            </Button>
+        <div className="from-brand-navy-900 to-accent-violet relative flex flex-col justify-center gap-6 overflow-hidden rounded-2xl bg-gradient-to-br p-8 text-white xl:flex-row xl:items-center">
+          <Image
+            src="/produit/studio.webp"
+            alt=""
+            width={420}
+            height={236}
+            className="hidden w-64 shrink-0 rounded-lg border border-white/20 shadow-2xl xl:block"
+          />
+          <div>
+            <h2 className="text-3xl font-extrabold">Prêt à commencer ?</h2>
+            <p className="mt-3 max-w-md text-white/85">
+              Lancez votre essai gratuit de 14 jours et concevez dès maintenant votre premier
+              vêtement en 3D.
+            </p>
+            <div className="mt-6">
+              <Button asChild size="lg">
+                <Link href="/inscription">
+                  Essayer gratuitement 14 jours <ArrowRight aria-hidden />
+                </Link>
+              </Button>
+            </div>
+            <p className="mt-4 text-sm text-white/75">Sans carte bancaire · Sans engagement</p>
           </div>
-          <p className="mt-4 text-sm text-white/75">Sans carte bancaire · Sans engagement</p>
         </div>
       </section>
     </>

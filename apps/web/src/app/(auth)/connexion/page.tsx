@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/auth-forms";
 import { safeNext } from "@/lib/auth/schemas";
 
@@ -11,10 +12,12 @@ export default async function Page({
 }) {
   const { suite, erreur } = await searchParams;
   return (
-    <>
-      <h1 className="font-display mb-1 text-3xl font-extrabold">Se connecter</h1>
-      <p className="text-muted-foreground mb-6 text-sm">Retrouvez vos projets et vos créations.</p>
+    <AuthShell
+      variant="login"
+      title="Se connecter"
+      subtitle="Ravi de vous revoir ! Connectez-vous à votre compte."
+    >
       <LoginForm next={safeNext(suite)} linkError={erreur === "lien"} />
-    </>
+    </AuthShell>
   );
 }

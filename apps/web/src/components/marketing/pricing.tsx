@@ -19,6 +19,13 @@ const ICONS: Record<PlanId, LucideIcon> = {
   enterprise: Building2,
 };
 
+const TINT: Record<PlanId, string> = {
+  free: "border-border bg-gradient-to-b from-[#eaf1ff] to-surface shadow-card",
+  creator: "border-border bg-gradient-to-b from-accent-violet-soft to-surface shadow-card",
+  business: "",
+  enterprise: "border-border bg-gradient-to-b from-[#eef2fb] to-surface shadow-card",
+};
+
 const nf = new Intl.NumberFormat("fr-FR");
 
 function Price({ plan, annual }: { plan: PlanId; annual: boolean }) {
@@ -45,7 +52,7 @@ function Card({ plan, annual }: { plan: PlanCard; annual: boolean }) {
         "relative flex flex-col rounded-2xl border p-6",
         dark
           ? "from-action to-brand-navy-800 border-transparent bg-gradient-to-b text-white shadow-xl"
-          : "border-border bg-surface shadow-card",
+          : TINT[plan.id],
       )}
     >
       {dark && (
