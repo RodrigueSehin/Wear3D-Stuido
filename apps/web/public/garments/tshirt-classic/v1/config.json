@@ -1,7 +1,14 @@
 {
   "reference": "TS-CLASSIC",
   "versionId": "tshirt-classic@1",
-  "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
+  "sizes": [
+    "XS",
+    "S",
+    "M",
+    "L",
+    "XL",
+    "XXL"
+  ],
   "materials": [
     "cotton",
     "polyester",
@@ -30,7 +37,13 @@
         "w": 300,
         "h": 400
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
@@ -50,7 +63,13 @@
         "w": 300,
         "h": 450
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
@@ -70,7 +89,13 @@
         "w": 100,
         "h": 100
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
@@ -90,7 +115,13 @@
         "w": 100,
         "h": 100
       },
-      "allows": ["color", "material", "pattern", "text", "image"],
+      "allows": [
+        "color",
+        "material",
+        "pattern",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"
@@ -106,7 +137,12 @@
         "w": 0.984375,
         "h": 0.06
       },
-      "allows": ["color", "material"],
+      "allows": [
+        "color",
+        "material",
+        "text",
+        "image"
+      ],
       "defaults": {
         "color": "#FFFFFF",
         "material": "cotton"

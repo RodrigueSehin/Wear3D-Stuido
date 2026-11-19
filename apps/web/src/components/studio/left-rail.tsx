@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Box,
   Palette,
+  Scissors,
   Settings,
   Shapes,
   Shirt,
@@ -22,6 +23,7 @@ const ITEMS: { id: RailItem; label: string; icon: LucideIcon }[] = [
   { id: "elements", label: "Éléments", icon: Shapes },
   { id: "mockups", label: "Maquettes", icon: Shirt },
   { id: "scenes", label: "Scènes", icon: Box },
+  { id: "pattern", label: "Patron", icon: Scissors },
   { id: "settings", label: "Paramètres", icon: Settings },
 ];
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { TSHIRT_CLASSIC } from "../catalog";
+import { FOOTBALL_JERSEY, HOODIE_CLASSIC, TSHIRT_CLASSIC } from "../catalog";
 import { MAX_TRIANGLES, meshNameToZoneCode } from "../conventions";
 import { readGlbJson, writeGlb } from "./glb";
 import { triangleCount } from "./mesh";
+import { FOOTBALL_SHAPE, HOODIE_SHAPE } from "./shapes";
 import { buildTshirtMeshes } from "./tshirt";
 
 const meshes = buildTshirtMeshes();
@@ -70,5 +71,29 @@ describe("writeGlb", () => {
     expect(nodes.map((n) => n.name)).toContain("Zone_Body_Front");
     const materials = json.materials as { name: string }[];
     expect(materials.map((m) => m.name)).toContain("Mat_Body_Front");
+  });
+});
+
+describe.each([
+  ["maillot de football", FOOTBALL_JERSEY, FOOTBALL_SHAPE],
+  ["hoodie", HOODIE_CLASSIC, HOODIE_SHAPE],
+])("%s procédural", (_name, def, shape) => {
+  const m = buildTshirtMeshes(shape);
+
+  it("respecte le budget et les zones de sa définition", () => {
+    expect(triangleCount(m)).toBeLessThan(MAX_TRIANGLES);
+    expect(m.map((x) => x.name).sort()).toEqual(def.zones.map((z) => z.meshName).sort());
+  });
+
+  it("garde chaque île UV dans le rectangle de sa zone", () => {
+    for (const mesh of m) {
+      const r = def.zones.find((z) => z.meshName === mesh.name)!.uvRect;
+      for (let i = 0; i < mesh.uvs.length; i += 2) {
+        expect(mesh.uvs[i]!).toBeGreaterThanOrEqual(r.x - 1e-6);
+        expect(mesh.uvs[i]!).toBeLessThanOrEqual(r.x + r.w + 1e-6);
+        expect(mesh.uvs[i + 1]!).toBeGreaterThanOrEqual(r.y - 1e-6);
+        expect(mesh.uvs[i + 1]!).toBeLessThanOrEqual(r.y + r.h + 1e-6);
+      }
+    }
   });
 });

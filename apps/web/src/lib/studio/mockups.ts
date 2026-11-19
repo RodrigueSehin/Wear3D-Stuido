@@ -146,6 +146,94 @@ export const MOCKUPS: readonly MockupTemplate[] = [
     sleeves: 3,
     pattern: placed("band-diagonal", 1, -90),
   },
+  {
+    id: "nuit-etoilee",
+    label: "Nuit étoilée",
+    categories: ["event", "business"],
+    colors: ["#0F172A", "#FFFFFF", "#F5B70A"],
+    sleeves: 1,
+    pattern: repeat("dots", 0.55, 0.45),
+  },
+  {
+    id: "camouflage",
+    label: "Camouflage",
+    categories: ["sport", "event"],
+    colors: ["#3F4E2B", "#6B7F3A", "#1F2A12"],
+    sleeves: 1,
+    pattern: repeat("camouflage", 0.95, 1.2),
+  },
+  {
+    id: "neon",
+    label: "Néon",
+    categories: ["sport", "event"],
+    colors: ["#111827", "#22C55E", "#22C55E"],
+    sleeves: 1,
+    pattern: placed("band-diagonal", 1),
+  },
+  {
+    id: "arctique",
+    label: "Arctique",
+    categories: ["sport"],
+    colors: ["#FFFFFF", "#0EA5E9", "#0369A1"],
+    sleeves: 1,
+    pattern: placed("chevron", 0.9),
+  },
+  {
+    id: "corsaire",
+    label: "Corsaire",
+    categories: ["sport"],
+    colors: ["#111827", "#FFFFFF", "#FFFFFF"],
+    sleeves: 1,
+    pattern: repeat("stripes", 1, 0.7, 90),
+  },
+  {
+    id: "sakura",
+    label: "Sakura",
+    categories: ["event"],
+    colors: ["#F9A8D4", "#FFFFFF", "#BE185D"],
+    sleeves: 1,
+    pattern: placed("splatter", 0.9),
+  },
+  {
+    id: "tricolore",
+    label: "Tricolore",
+    categories: ["sport", "event"],
+    colors: ["#FFFFFF", "#DC2626", "#1D4ED8"],
+    sleeves: 3,
+    pattern: placed("band-diagonal", 1),
+  },
+  {
+    id: "corporate",
+    label: "Corporate",
+    categories: ["business"],
+    colors: ["#14243B", "#2B4A75", "#F5B70A"],
+    sleeves: 1,
+    pattern: repeat("diagonal", 0.6, 0.5),
+  },
+  {
+    id: "ardoise",
+    label: "Ardoise",
+    categories: ["business"],
+    colors: ["#334155", "#94A3B8", "#FFFFFF"],
+    sleeves: 1,
+    pattern: repeat("grain", 0.5, 1),
+  },
+  {
+    id: "solaire",
+    label: "Solaire",
+    categories: ["event"],
+    colors: ["#F97316", "#FDE68A", "#7C2D12"],
+    sleeves: 1,
+    pattern: placed("spotlight", 0.9),
+  },
+  {
+    id: "glacier",
+    label: "Glacier",
+    categories: ["business", "sport"],
+    colors: ["#E0F2FE", "#38BDF8", "#0369A1"],
+    sleeves: 3,
+    pattern: placed("shards", 0.85),
+  },
 ];
 
 export function filterMockups(category: MockupCategory | "all", query: string): MockupTemplate[] {
@@ -281,5 +369,15 @@ export function withMockup(
       zones[z.code] = next;
     }
   }
-  return { ...doc, zones, mockup: m };
+  // Bords de manche (si le modèle en a) : couleur de finition, contrastée avec la manche.
+  const cuffs = def?.trims?.cuffs
+    ? {
+        enabled: true,
+        color: t.sleeves === 3 ? c1 : c3,
+        width: doc.trims?.cuffs?.width ?? def.trims.cuffs.defaultWidth,
+        stripes: doc.trims?.cuffs?.stripes ?? 0,
+        stripeColor: doc.trims?.cuffs?.stripeColor ?? c2,
+      }
+    : undefined;
+  return { ...doc, zones, mockup: m, ...(cuffs ? { trims: { ...doc.trims, cuffs } } : {}) };
 }

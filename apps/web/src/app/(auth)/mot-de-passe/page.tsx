@@ -1,8 +1,17 @@
 import type { Metadata } from "next";
-import { PagePlaceholder } from "@/components/page-placeholder";
+import { ForgotPasswordForm } from "@/components/auth/auth-forms";
 
 export const metadata: Metadata = { title: "Mot de passe oublié" };
 
 export default function Page() {
-  return <PagePlaceholder title={"Mot de passe oublié"} phase="Phase 3" />;
+  return (
+    <>
+      <h1 className="font-display mb-1 text-3xl font-extrabold">Mot de passe oublié</h1>
+      <p className="text-muted-foreground mb-6 text-sm">
+        Saisissez votre adresse e-mail : nous vous envoyons un lien pour choisir un nouveau mot de
+        passe.
+      </p>
+      <ForgotPasswordForm />
+    </>
+  );
 }

@@ -12,14 +12,30 @@ import type {
   Scene,
 } from "@wear3d/design-schema";
 import { SnapshotHistory } from "@wear3d/editor-2d";
-import type { GarmentDefinition, LightingPreset, ViewPreset } from "@wear3d/garment-engine";
+import {
+  getGarmentByVersion,
+  type GarmentDefinition,
+  type LightingPreset,
+  type ViewPreset,
+} from "@wear3d/garment-engine";
 import { create } from "zustand";
 import type { FlatMode } from "./flat-layout";
+import type { PatternSide, PatternTab, PatternUnit } from "./sewing";
 import { withMockup } from "./mockups";
 
 /** Entrées du rail gauche (maquette Studio). */
 export type RailItem =
-  "design" | "textures" | "logos" | "texts" | "elements" | "mockups" | "scenes" | "settings";
+  | "design"
+  | "textures"
+  | "logos"
+  | "texts"
+  | "elements"
+  | "mockups"
+  | "scenes"
+  | "pattern"
+  | "settings";
+/** Vue centrale : 3D, 2D à plat, ou patron de couture avec aperçu 3D. */
+export type ViewMode = "3d" | "2d" | "pattern";
 export type LibraryTab = "models" | "colors" | "patterns" | "fabrics";
 export type ViewerTool = "select" | "move" | "pan" | "orbit";
 export type SaveState = "idle" | "saving" | "saved" | "offline" | "error";
@@ -52,7 +68,12 @@ interface StudioState {
   libraryOpen: boolean;
   libraryTab: LibraryTab;
   inspectorOpen: boolean;
-  viewMode: "3d" | "2d";
+  viewMode: ViewMode;
+  /** Vue Patron : onglet, unité, face du tissu et pièce sélectionnée. */
+  patternTab: PatternTab;
+  patternUnit: PatternUnit;
+  patternSide: PatternSide;
+  selectedPiece: string | null;
   tool: ViewerTool;
   preview: boolean;
   lighting: LightingPreset;
@@ -66,6 +87,8 @@ interface StudioState {
   activeView: ViewPreset;
   recentColors: string[];
   saveState: SaveState;
+  /** Le design a été modifié dans un autre onglet : l’autosave attend le choix de l’utilisateur. */
+  conflict: boolean;
   lastSavedAt: Date | null;
   canUndo: boolean;
   canRedo: boolean;
@@ -77,6 +100,8 @@ interface StudioState {
     doc: DesignDocument;
   }): void;
   rename(name: string): void;
+  /** Change de vêtement en gardant les calques : les zones portent les mêmes codes. */
+  changeModel(definition: GarmentDefinition): void;
   /** Applique une modification au document ; `coalesceKey` regroupe un geste continu. */
   update(recipe: (doc: DesignDocument) => DesignDocument, coalesceKey?: string): void;
   seal(): void;
@@ -107,7 +132,11 @@ interface StudioState {
   setLibraryOpen(open: boolean): void;
   setLibraryTab(tab: LibraryTab): void;
   setInspectorOpen(open: boolean): void;
-  setViewMode(mode: "3d" | "2d"): void;
+  setViewMode(mode: ViewMode): void;
+  setPatternTab(tab: PatternTab): void;
+  setPatternUnit(unit: PatternUnit): void;
+  setPatternSide(side: PatternSide): void;
+  selectPiece(id: string | null): void;
   setTool(tool: ViewerTool): void;
   setPreview(preview: boolean): void;
   setLighting(lighting: LightingPreset): void;
@@ -123,6 +152,7 @@ interface StudioState {
   setDragging(dragging: boolean): void;
   setActiveView(view: ViewPreset): void;
   pushRecentColor(color: string): void;
+  setConflict(conflict: boolean): void;
   setSaveState(state: SaveState): void;
 }
 
@@ -135,6 +165,13 @@ export function patternZones(doc: DesignDocument | null): string[] {
         .filter(([, z]) => z.pattern)
         .map(([code]) => code)
     : [];
+}
+
+/** Après annuler / rétablir : le vêtement affiché suit la version du modèle du document. */
+function garmentOf(s: { definition: GarmentDefinition | null }, doc: DesignDocument) {
+  if (s.definition?.versionId === doc.model.versionId) return {};
+  const definition = getGarmentByVersion(doc.model.versionId);
+  return definition ? { definition } : {};
 }
 
 export const useStudio = create<StudioState>()((set, get) => ({
@@ -151,6 +188,10 @@ export const useStudio = create<StudioState>()((set, get) => ({
   libraryTab: "models",
   inspectorOpen: true,
   viewMode: "3d",
+  patternTab: "pattern",
+  patternUnit: "cm",
+  patternSide: "front",
+  selectedPiece: "front",
   tool: "select",
   preview: false,
   lighting: "studio",
@@ -161,6 +202,7 @@ export const useStudio = create<StudioState>()((set, get) => ({
   activeView: "front",
   recentColors: ["#1D4ED8", "#FFFFFF", "#0B1530", "#DC2626", "#16A34A", "#F5B70A", "#7C3AED"],
   saveState: "idle",
+  conflict: false,
   lastSavedAt: null,
   canUndo: false,
   canRedo: false,
@@ -176,6 +218,7 @@ export const useStudio = create<StudioState>()((set, get) => ({
       selection: null,
       selectedZone: definition.zones[0]?.code ?? null,
       saveState: "saved",
+      conflict: false,
       lastSavedAt: new Date(),
       ...flags(),
     });
@@ -183,6 +226,22 @@ export const useStudio = create<StudioState>()((set, get) => ({
 
   rename(name) {
     set((s) => ({ name, revision: s.revision + 1 }));
+  },
+
+  changeModel(definition) {
+    if (get().definition?.versionId === definition.versionId) return;
+    get().seal();
+    get().update((doc) => ({
+      ...doc,
+      model: { ...doc.model, versionId: definition.versionId },
+    }));
+    set((s) => ({
+      definition,
+      selectedZone: definition.zones.some((z) => z.code === s.selectedZone)
+        ? s.selectedZone
+        : (definition.zones[0]?.code ?? null),
+    }));
+    get().seal();
   },
 
   update(recipe, coalesceKey) {
@@ -203,7 +262,13 @@ export const useStudio = create<StudioState>()((set, get) => ({
     if (!doc) return;
     const prev = history.undo(doc);
     if (prev)
-      set((s) => ({ doc: prev, revision: s.revision + 1, ...flags(), ...keepSelection(s, prev) }));
+      set((s) => ({
+        doc: prev,
+        revision: s.revision + 1,
+        ...flags(),
+        ...keepSelection(s, prev),
+        ...garmentOf(s, prev),
+      }));
   },
 
   redo() {
@@ -211,7 +276,13 @@ export const useStudio = create<StudioState>()((set, get) => ({
     if (!doc) return;
     const next = history.redo(doc);
     if (next)
-      set((s) => ({ doc: next, revision: s.revision + 1, ...flags(), ...keepSelection(s, next) }));
+      set((s) => ({
+        doc: next,
+        revision: s.revision + 1,
+        ...flags(),
+        ...keepSelection(s, next),
+        ...garmentOf(s, next),
+      }));
   },
 
   setZoneColor(zone, color, coalesceKey) {
@@ -347,6 +418,12 @@ export const useStudio = create<StudioState>()((set, get) => ({
     set((s) => ({
       rail: item,
       libraryOpen: s.rail === item ? !s.libraryOpen : true,
+      // « Patron » ouvre la vue patron ; un autre outil ramène à la 3D.
+      ...(item === "pattern"
+        ? { viewMode: "pattern" as const }
+        : s.viewMode === "pattern"
+          ? { viewMode: "3d" as const }
+          : {}),
       ...(item === "design" && s.rail !== "design" ? { libraryTab: "models" as const } : {}),
       ...(item === "textures" ? { libraryTab: "fabrics" as const } : {}),
     }));
@@ -361,7 +438,26 @@ export const useStudio = create<StudioState>()((set, get) => ({
     set({ inspectorOpen });
   },
   setViewMode(viewMode) {
-    set({ viewMode });
+    set((s) => ({
+      viewMode,
+      ...(viewMode === "pattern"
+        ? { rail: "pattern" as const }
+        : s.rail === "pattern"
+          ? { rail: "design" as const }
+          : {}),
+    }));
+  },
+  setPatternTab(patternTab) {
+    set({ patternTab });
+  },
+  setPatternUnit(patternUnit) {
+    set({ patternUnit });
+  },
+  setPatternSide(patternSide) {
+    set({ patternSide });
+  },
+  selectPiece(selectedPiece) {
+    set({ selectedPiece });
   },
   setTool(tool) {
     set({ tool });
@@ -422,6 +518,10 @@ export const useStudio = create<StudioState>()((set, get) => ({
     const c = color.toUpperCase();
     set((s) => ({ recentColors: [c, ...s.recentColors.filter((x) => x !== c)].slice(0, 8) }));
   },
+  setConflict(conflict) {
+    set({ conflict });
+  },
+
   setSaveState(saveState) {
     set(saveState === "saved" ? { saveState, lastSavedAt: new Date() } : { saveState });
   },

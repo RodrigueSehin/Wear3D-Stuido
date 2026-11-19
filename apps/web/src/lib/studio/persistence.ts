@@ -23,8 +23,26 @@ export async function loadDesign(id: string): Promise<StoredDesign | undefined> 
   return { ...raw, document: parseDesignDocument(raw.document) };
 }
 
+const TAB_ID = typeof crypto !== "undefined" ? crypto.randomUUID() : "tab";
+const channel = () =>
+  typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("wear3d-design-saves");
+
 export async function saveDesign(design: StoredDesign): Promise<void> {
   await set(design.id, design, designs());
+  // Prévient les autres onglets ouverts sur le même design (détection de conflit).
+  const c = channel();
+  c?.postMessage({ id: design.id, tab: TAB_ID });
+  c?.close();
+}
+
+/** Appelle `cb` quand un AUTRE onglet enregistre ce design ; renvoie la fonction de désabonnement. */
+export function onRemoteSave(id: string, cb: () => void): () => void {
+  const c = channel();
+  if (!c) return () => undefined;
+  c.onmessage = (e: MessageEvent<{ id: string; tab: string }>) => {
+    if (e.data.id === id && e.data.tab !== TAB_ID) cb();
+  };
+  return () => c.close();
 }
 
 export async function listDesignIds(): Promise<string[]> {

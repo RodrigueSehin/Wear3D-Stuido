@@ -35,6 +35,15 @@ export const TSHIRT_CLASSIC: GarmentDefinition = {
     "satin",
     "carbon",
   ],
+  // Bas de manche : v croît de l'épaule vers le poignet dans l'île de la manche.
+  trims: {
+    cuffs: {
+      zones: ["SLEEVE_LEFT", "SLEEVE_RIGHT"],
+      edge: "bottom",
+      defaultWidth: 0.12,
+      sleeveLengthCm: 22,
+    },
+  },
   zones: [
     {
       code: "BODY_FRONT",
@@ -77,7 +86,8 @@ export const TSHIRT_CLASSIC: GarmentDefinition = {
       meshName: "Zone_Collar",
       label: "Col",
       uvRect: TSHIRT_UV.COLLAR!,
-      allows: ["color", "material"],
+      // Col : couleur, tissu, et petits marquages (texte ou logo de nuque).
+      allows: ["color", "material", "text", "image"],
       defaults: { color: "#FFFFFF", material: "cotton" },
     },
   ],

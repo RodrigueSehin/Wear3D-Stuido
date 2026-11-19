@@ -1,11 +1,14 @@
 /** Préréglages de vue et d'éclairage — sans dépendance à three.js (importables partout). */
 
-export type LightingPreset = "studio" | "outdoor" | "showroom";
+export type LightingPreset = "studio" | "outdoor" | "showroom" | "sunset" | "boutique" | "night";
 
 export const LIGHTING_LABELS: Record<LightingPreset, string> = {
   studio: "Studio",
   outdoor: "Extérieur",
   showroom: "Vitrine",
+  sunset: "Coucher de soleil",
+  boutique: "Boutique",
+  night: "Nuit",
 };
 
 export type ViewPreset = "front" | "back" | "left" | "right" | "three-quarter";

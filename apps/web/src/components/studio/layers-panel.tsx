@@ -13,21 +13,28 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@wear3d/ui";
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
+  ChevronRight,
   Copy,
   Eye,
   EyeOff,
+  FolderMinus,
+  FolderPlus,
+  Folder,
   GripVertical,
   Hash,
   ImageIcon,
   Lock,
   LockOpen,
   MoreHorizontal,
+  MoveRight,
   Plus,
   Shapes,
   Trash2,
@@ -41,7 +48,20 @@ import { patternPreview } from "@/lib/studio/patterns";
 import { useSceneBackdrop } from "@/lib/studio/scene-backdrop";
 import { effectiveColors, MOCKUPS } from "@/lib/studio/mockups";
 import { sceneById } from "@/lib/studio/scenes";
+import { moveLayerToZone, zoneAccepts } from "@/lib/studio/interaction";
+import {
+  assignGroup,
+  duplicateGroup,
+  groupsOf,
+  removeGroup,
+  renameGroup,
+  setGroupLocked,
+  setGroupVisible,
+  ungroup,
+  type LayerGroup,
+} from "@/lib/studio/groups";
 import { placementZone, revealZone } from "@/lib/studio/placement";
+import { PatternLayers } from "./pattern-panels";
 import { contrastColor } from "@/lib/studio/textures";
 import { patternZones, useStudio } from "@/lib/studio/store";
 import { PanelCard, PanelTitle } from "./controls";
@@ -85,6 +105,10 @@ function Thumb({ layer }: { layer: Layer }) {
 }
 
 function RowMenu({ layer }: { layer: Layer }) {
+  const zones = useStudio((st) => st.definition?.zones ?? []);
+  // Zones qui acceptent ce calque, hors sa zone actuelle (devant, dos, manches, col).
+  const groups = groupsOf(useStudio((st) => st.doc));
+  const targets = zones.filter((z) => z.code !== layer.zone && zoneAccepts(z.code, layer));
   const { duplicateLayer, removeLayer, reorderLayer, updateLayer, seal } = useStudio.getState();
   return (
     <DropdownMenu>
@@ -107,6 +131,35 @@ function RowMenu({ layer }: { layer: Layer }) {
         <DropdownMenuItem onSelect={() => reorderLayer(layer.id, "down")}>
           <ArrowDown /> Descendre
         </DropdownMenuItem>
+        {targets.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Déplacer vers</DropdownMenuLabel>
+            {targets.map((z) => (
+              <DropdownMenuItem key={z.code} onSelect={() => moveLayerToZone(layer.id, z.code)}>
+                <MoveRight /> {z.label}
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Groupe</DropdownMenuLabel>
+        <DropdownMenuItem onSelect={() => assignGroup(layer.id, "new")}>
+          <FolderPlus /> Nouveau groupe
+        </DropdownMenuItem>
+        {groups
+          .filter((g) => g.id !== layer.group)
+          .map((g) => (
+            <DropdownMenuItem key={g.id} onSelect={() => assignGroup(layer.id, g.id)}>
+              <Folder /> {g.name}
+            </DropdownMenuItem>
+          ))}
+        {layer.group && (
+          <DropdownMenuItem onSelect={() => assignGroup(layer.id, null)}>
+            <FolderMinus /> Sortir du groupe
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {
             seal();
@@ -125,10 +178,91 @@ function RowMenu({ layer }: { layer: Layer }) {
   );
 }
 
+/** En-tête d'un groupe (visibilité, verrou, renommer, dupliquer, dissoudre) et ses calques. */
+function GroupRows({
+  group,
+  renderLayer,
+}: {
+  group: LayerGroup;
+  renderLayer: (layer: Layer) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  const visible = group.layers.some((l) => l.visible);
+  const locked = group.layers.every((l) => l.locked);
+  return (
+    <>
+      <li className={cn(row, "bg-surface-muted/60 h-10")}>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? "Replier le groupe" : "Déplier le groupe"}
+          aria-expanded={open}
+          className="rounded p-0.5 text-[#0b1530] hover:bg-white"
+        >
+          {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => setGroupVisible(group.id, !visible)}
+          aria-label={visible ? "Masquer le groupe" : "Afficher le groupe"}
+          className="rounded p-0.5 text-[#0b1530] hover:bg-white"
+        >
+          {visible ? <Eye className="size-5" /> : <EyeOff className="size-5 opacity-50" />}
+        </button>
+        <Folder className="size-4 shrink-0 text-[#0b1530]/60" aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#0b1530]">
+          {group.name} <span className="font-normal opacity-60">({group.layers.length})</span>
+        </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Actions du groupe ${group.name}`}
+              className="rounded-md p-1 text-[#0b1530] hover:bg-white"
+            >
+              <MoreHorizontal className="size-5" aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() => {
+                const name = window.prompt("Nom du groupe", group.name);
+                if (name) renameGroup(group.id, name);
+              }}
+            >
+              Renommer
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setGroupLocked(group.id, !locked)}>
+              {locked ? <LockOpen /> : <Lock />} {locked ? "Déverrouiller" : "Verrouiller"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => duplicateGroup(group.id)}>
+              <Copy /> Dupliquer
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => ungroup(group.id)}>
+              <FolderMinus /> Dissoudre
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem destructive onSelect={() => removeGroup(group.id)}>
+              <Trash2 /> Supprimer le groupe
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </li>
+      {open && group.layers.map((l) => renderLayer(l))}
+    </>
+  );
+}
+
 const row = "group flex h-[54px] items-center gap-2 rounded-xl px-2 transition";
 
 /** Panneau Calques (maquette Studio) : ordre par glisser-déposer, visibilité, actions. */
+/** Calques : ceux du design, ou les pièces en vue Patron. */
 export function LayersPanel() {
+  const patternMode = useStudio((s) => s.viewMode === "pattern");
+  return patternMode ? <PatternLayers /> : <DesignLayersPanel />;
+}
+
+function DesignLayersPanel() {
   // Rafraîchit les vignettes quand les images finissent de charger (l'atlas est recomposé).
   useAtlas((s) => s.version);
   const doc = useStudio((s) => s.doc);
@@ -165,6 +299,85 @@ export function LayersPanel() {
     addLayer(layer);
     revealZone(layer.zone);
   };
+
+  const renderLayer = (layer: Layer, i: number, nested: boolean) => {
+    const selected = selection?.kind === "layer" && selection.id === layer.id;
+    const docIndex = layers.length - 1 - i;
+    return (
+      <li
+        key={layer.id}
+        draggable
+        onDragStart={(e) => {
+          setDragId(layer.id);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOverIndex(i);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (dragId) moveLayerTo(dragId, docIndex);
+          setDragId(null);
+          setOverIndex(null);
+        }}
+        onDragEnd={() => {
+          setDragId(null);
+          setOverIndex(null);
+        }}
+        className={cn(
+          row,
+          nested && "ml-5",
+          selected ? "bg-[#e3ecff]" : "hover:bg-surface-muted",
+          overIndex === i && dragId !== layer.id && "ring-action ring-2",
+          dragId === layer.id && "opacity-50",
+        )}
+      >
+        <GripVertical className="size-4 shrink-0 cursor-grab text-[#0b1530]/50" aria-hidden />
+        <button
+          type="button"
+          onClick={() => toggleVisible(layer)}
+          aria-label={layer.visible ? "Masquer" : "Afficher"}
+          className="rounded p-0.5 text-[#0b1530] hover:bg-white"
+        >
+          {layer.visible ? (
+            <Eye className="size-5" aria-hidden />
+          ) : (
+            <EyeOff className="size-5 opacity-50" aria-hidden />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => select({ kind: "layer", id: layer.id })}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+        >
+          <Thumb layer={layer} />
+          <span
+            className={cn("truncate text-[15px] text-[#0b1530]", !layer.visible && "opacity-50")}
+          >
+            {layerLabel(layer)}
+          </span>
+          {layer.locked && <Lock className="size-3.5 shrink-0 opacity-60" aria-hidden />}
+        </button>
+        <RowMenu layer={layer} />
+      </li>
+    );
+  };
+
+  const orderedIndex = (id: string) => ordered.findIndex((l) => l.id === id);
+  const groupList = groupsOf(doc);
+  const items: (
+    { kind: "layer"; layer: Layer; i: number } | { kind: "group"; group: LayerGroup }
+  )[] = [];
+  const seen = new Set<string>();
+  ordered.forEach((layer, i) => {
+    if (!layer.group) return items.push({ kind: "layer", layer, i });
+    if (seen.has(layer.group)) return;
+    seen.add(layer.group);
+    const group = groupList.find((g) => g.id === layer.group);
+    if (group) items.push({ kind: "group", group });
+    else items.push({ kind: "layer", layer, i });
+  });
 
   return (
     <PanelCard className="w-[272px] shrink-0">
@@ -251,71 +464,17 @@ export function LayersPanel() {
           </li>
         )}
 
-        {ordered.map((layer, i) => {
-          const selected = selection?.kind === "layer" && selection.id === layer.id;
-          const docIndex = layers.length - 1 - i;
-          return (
-            <li
-              key={layer.id}
-              draggable
-              onDragStart={(e) => {
-                setDragId(layer.id);
-                e.dataTransfer.effectAllowed = "move";
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setOverIndex(i);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragId) moveLayerTo(dragId, docIndex);
-                setDragId(null);
-                setOverIndex(null);
-              }}
-              onDragEnd={() => {
-                setDragId(null);
-                setOverIndex(null);
-              }}
-              className={cn(
-                row,
-                selected ? "bg-[#e3ecff]" : "hover:bg-surface-muted",
-                overIndex === i && dragId !== layer.id && "ring-action ring-2",
-                dragId === layer.id && "opacity-50",
-              )}
-            >
-              <GripVertical className="size-4 shrink-0 cursor-grab text-[#0b1530]/50" aria-hidden />
-              <button
-                type="button"
-                onClick={() => toggleVisible(layer)}
-                aria-label={layer.visible ? "Masquer" : "Afficher"}
-                className="rounded p-0.5 text-[#0b1530] hover:bg-white"
-              >
-                {layer.visible ? (
-                  <Eye className="size-5" aria-hidden />
-                ) : (
-                  <EyeOff className="size-5 opacity-50" aria-hidden />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => select({ kind: "layer", id: layer.id })}
-                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-              >
-                <Thumb layer={layer} />
-                <span
-                  className={cn(
-                    "truncate text-[15px] text-[#0b1530]",
-                    !layer.visible && "opacity-50",
-                  )}
-                >
-                  {layerLabel(layer)}
-                </span>
-                {layer.locked && <Lock className="size-3.5 shrink-0 opacity-60" aria-hidden />}
-              </button>
-              <RowMenu layer={layer} />
-            </li>
-          );
-        })}
+        {items.map((it) =>
+          it.kind === "layer" ? (
+            renderLayer(it.layer, it.i, false)
+          ) : (
+            <GroupRows
+              key={it.group.id}
+              group={it.group}
+              renderLayer={(l) => renderLayer(l, orderedIndex(l.id), true)}
+            />
+          ),
+        )}
 
         {mockup && (
           <li
