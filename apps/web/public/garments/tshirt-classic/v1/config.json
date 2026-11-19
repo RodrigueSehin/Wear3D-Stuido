@@ -2,7 +2,19 @@
   "reference": "TS-CLASSIC",
   "versionId": "tshirt-classic@1",
   "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
-  "materials": ["cotton", "polyester", "poly-sport", "elastane", "sport-mesh", "technical"],
+  "materials": [
+    "cotton",
+    "polyester",
+    "poly-sport",
+    "elastane",
+    "sport-mesh",
+    "technical",
+    "microfiber",
+    "honeycomb",
+    "knit",
+    "satin",
+    "carbon"
+  ],
   "zones": [
     {
       "code": "BODY_FRONT",

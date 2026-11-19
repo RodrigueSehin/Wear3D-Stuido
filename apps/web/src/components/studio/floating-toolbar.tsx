@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useStudio, type ViewerTool } from "@/lib/studio/store";
-import { viewerBridge } from "@/lib/studio/viewer-bridge";
+import { flatBridge, viewerBridge } from "@/lib/studio/viewer-bridge";
 
 const TOOLS: { id: ViewerTool; label: string; icon: LucideIcon }[] = [
   { id: "select", label: "Sélection", icon: MousePointer2 },
@@ -42,7 +42,7 @@ export function FloatingToolbar() {
           title={label}
           aria-label={label}
           aria-pressed={tool === id}
-          disabled={viewMode === "2d" && (id === "pan" || id === "orbit")}
+          disabled={viewMode === "2d" && id === "orbit"}
           onClick={() => setTool(id)}
           className={cn(btn, tool === id && "bg-action hover:bg-action text-white")}
         >
@@ -53,8 +53,7 @@ export function FloatingToolbar() {
         type="button"
         title="Zoom avant"
         aria-label="Zoom avant"
-        disabled={viewMode === "2d"}
-        onClick={() => viewerBridge.viewer?.zoom(1)}
+        onClick={() => (viewMode === "2d" ? flatBridge.zoom?.(1) : viewerBridge.viewer?.zoom(1))}
         className={btn}
       >
         <ZoomIn className="size-5" aria-hidden />
@@ -63,8 +62,7 @@ export function FloatingToolbar() {
         type="button"
         title="Zoom arrière"
         aria-label="Zoom arrière"
-        disabled={viewMode === "2d"}
-        onClick={() => viewerBridge.viewer?.zoom(-1)}
+        onClick={() => (viewMode === "2d" ? flatBridge.zoom?.(-1) : viewerBridge.viewer?.zoom(-1))}
         className={btn}
       >
         <ZoomOut className="size-5" aria-hidden />

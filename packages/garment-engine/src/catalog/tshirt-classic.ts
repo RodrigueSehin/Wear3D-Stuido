@@ -22,7 +22,19 @@ export const TSHIRT_CLASSIC: GarmentDefinition = {
   family: "tshirts",
   glbUrl: "/garments/tshirt-classic/v1/model.glb",
   sizes: ["XS", "S", "M", "L", "XL", "XXL"],
-  materials: ["cotton", "polyester", "poly-sport", "elastane", "sport-mesh", "technical"],
+  materials: [
+    "cotton",
+    "polyester",
+    "poly-sport",
+    "elastane",
+    "sport-mesh",
+    "technical",
+    "microfiber",
+    "honeycomb",
+    "knit",
+    "satin",
+    "carbon",
+  ],
   zones: [
     {
       code: "BODY_FRONT",

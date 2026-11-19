@@ -80,6 +80,51 @@
   }
 }
 
+/* Relais des vêtements du hero : l'actif au centre, le précédent sort à gauche. */
+@layer components {
+  .hero-relay {
+    transition:
+      transform 900ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 700ms ease;
+    will-change: transform, opacity;
+  }
+  .hero-relay[data-state="active"] {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  .hero-relay[data-state="out"] {
+    transform: translateX(-35%) scale(0.85);
+    opacity: 0;
+  }
+  .hero-relay[data-state="wait"] {
+    transform: translateX(35%) scale(0.85);
+    opacity: 0;
+  }
+  .hero-float {
+    animation: hero-float 5s ease-in-out infinite;
+  }
+  @keyframes hero-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-relay {
+      transition: opacity 300ms ease;
+    }
+    .hero-relay[data-state] {
+      transform: none;
+    }
+    .hero-float {
+      animation: none;
+    }
+  }
+}
+
 /* Curseur 360° du studio : piste fine, poignée blanche cerclée de bleu. */
 @layer components {
   .studio-range {
@@ -106,4 +151,82 @@
     border: 3px solid var(--action);
     box-shadow: 0 2px 8px rgb(15 35 90 / 0.25);
   }
+}
+
+/*
+ * Thème du Studio 3D (Paramètres → Couleurs & Thème). Le studio fixe son propre thème,
+ * indépendamment de celui du système : les jetons sont redéfinis sur sa racine.
+ * Règles hors @layer : elles priment sur les utilitaires Tailwind codés en dur.
+ */
+[data-studio-theme] {
+  color: var(--foreground);
+}
+
+[data-studio-theme="light"] {
+  color-scheme: light;
+  --background: #f4f7fe;
+  --surface: #ffffff;
+  --surface-muted: #eef2fb;
+  --border: #e2e8f5;
+  --foreground: #0b1530;
+  --muted-foreground: #5b6585;
+  --viewport-from: #eef3fc;
+  --viewport-to: #dce5f5;
+}
+
+[data-studio-theme="dark"] {
+  color-scheme: dark;
+  --background: #070d1f;
+  --surface: #0e1730;
+  --surface-muted: #152042;
+  --border: #22305a;
+  --foreground: #eef2fb;
+  --muted-foreground: #9aa6c7;
+  --viewport-from: #121c36;
+  --viewport-to: #0a1226;
+  --danger: #ff6b6f;
+}
+
+[data-studio-theme="dark"] .bg-white {
+  background-color: #111b38;
+}
+[data-studio-theme="dark"] .bg-white\/85,
+[data-studio-theme="dark"] .bg-white\/90 {
+  background-color: rgb(14 23 48 / 0.9);
+}
+[data-studio-theme="dark"] .bg-white\/80,
+[data-studio-theme="dark"] .bg-white\/70,
+[data-studio-theme="dark"] .bg-white\/60 {
+  background-color: rgb(17 27 56 / 0.75);
+}
+[data-studio-theme="dark"] .border-white\/70,
+[data-studio-theme="dark"] .border-white {
+  border-color: rgb(255 255 255 / 0.08);
+}
+[data-studio-theme="dark"] .text-\[\#0b1530\] {
+  color: #eef2fb;
+}
+[data-studio-theme="dark"] .bg-\[\#e9eef8\],
+[data-studio-theme="dark"] .from-\[\#eef2fa\] {
+  --tw-gradient-from: #1a2650;
+  background-color: #1a2650;
+}
+[data-studio-theme="dark"] .to-\[\#dfe6f3\] {
+  --tw-gradient-to: #141e40;
+}
+[data-studio-theme="dark"] .bg-action-soft {
+  background-color: rgb(77 127 255 / 0.18);
+}
+[data-studio-theme="dark"] input,
+[data-studio-theme="dark"] textarea,
+[data-studio-theme="dark"] select {
+  color: #eef2fb;
+}
+[data-studio-theme="dark"] .studio-stage {
+  background: radial-gradient(ellipse at 45% 40%, #1b2a55 0%, #111c3c 45%, #0a1226 100%);
+}
+[data-studio-theme="dark"] .bg-\[\#e3ecff\],
+[data-studio-theme="dark"] .hover\:bg-\[\#dde6f6\]:hover,
+[data-studio-theme="dark"] .bg-\[\#eef3fb\] {
+  background-color: rgb(77 127 255 / 0.22);
 }

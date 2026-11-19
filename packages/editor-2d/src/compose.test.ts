@@ -96,6 +96,7 @@ describe("composeAtlas", () => {
     doc.zones.BODY_FRONT!.pattern = {
       assetId: "pattern:band-diagonal",
       mode: "placed",
+      blendMode: "normal",
       color: "#FF0000",
       scale: 1,
       rotation: 0,

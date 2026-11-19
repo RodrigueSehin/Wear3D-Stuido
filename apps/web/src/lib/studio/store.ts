@@ -3,10 +3,19 @@
  * Le document de design est immuable : chaque modification produit un nouvel objet,
  * l'ancien est poussé dans l'historique (gestes continus regroupés).
  */
-import type { DesignDocument, Layer, MaterialCode, Pattern } from "@wear3d/design-schema";
+import type {
+  DesignDocument,
+  Layer,
+  MaterialCode,
+  Mockup,
+  Pattern,
+  Scene,
+} from "@wear3d/design-schema";
 import { SnapshotHistory } from "@wear3d/editor-2d";
 import type { GarmentDefinition, LightingPreset, ViewPreset } from "@wear3d/garment-engine";
 import { create } from "zustand";
+import type { FlatMode } from "./flat-layout";
+import { withMockup } from "./mockups";
 
 /** Entrées du rail gauche (maquette Studio). */
 export type RailItem =
@@ -19,7 +28,12 @@ export type SaveState = "idle" | "saving" | "saved" | "offline" | "error";
  * Sélection de l'inspecteur : un calque, la couleur de base (zones) ou le motif graphique.
  */
 export type Selection =
-  { kind: "layer"; id: string } | { kind: "base" } | { kind: "pattern" } | null;
+  | { kind: "layer"; id: string }
+  | { kind: "base" }
+  | { kind: "pattern" }
+  | { kind: "scene" }
+  | { kind: "mockup" }
+  | null;
 
 const history = new SnapshotHistory<DesignDocument>();
 
@@ -43,7 +57,11 @@ interface StudioState {
   preview: boolean;
   lighting: LightingPreset;
   showPodium: boolean;
+  /** Rotation automatique (vue par défaut « 360° ») jusqu'à la première interaction. */
+  autoSpin: boolean;
   dragging: boolean;
+  /** Vue 2D affichée (Face + Dos, ou une seule vue). */
+  flatMode: FlatMode;
   /** Vue la plus proche de la caméra (miniatures, barre « Vue »). */
   activeView: ViewPreset;
   recentColors: string[];
@@ -94,6 +112,14 @@ interface StudioState {
   setPreview(preview: boolean): void;
   setLighting(lighting: LightingPreset): void;
   setShowPodium(show: boolean): void;
+  setAutoSpin(spin: boolean): void;
+  setFlatMode(mode: FlatMode): void;
+  /** Choisit (ou retire) la scène de présentation : une étape d'historique. */
+  setScene(scene: Scene | undefined): void;
+  /** Ajuste la scène courante ; `coalesceKey` regroupe un geste continu (curseur). */
+  patchScene(patch: Partial<Scene>, coalesceKey?: string): void;
+  /** Réajuste la maquette appliquée (recoloration, intensité…) et la réécrit dans les zones. */
+  patchMockup(patch: Partial<Mockup>, coalesceKey?: string): void;
   setDragging(dragging: boolean): void;
   setActiveView(view: ViewPreset): void;
   pushRecentColor(color: string): void;
@@ -129,6 +155,8 @@ export const useStudio = create<StudioState>()((set, get) => ({
   preview: false,
   lighting: "studio",
   showPodium: true,
+  autoSpin: false,
+  flatMode: "both",
   dragging: false,
   activeView: "front",
   recentColors: ["#1D4ED8", "#FFFFFF", "#0B1530", "#DC2626", "#16A34A", "#F5B70A", "#7C3AED"],
@@ -344,6 +372,43 @@ export const useStudio = create<StudioState>()((set, get) => ({
   setLighting(lighting) {
     set({ lighting });
   },
+  setAutoSpin(autoSpin) {
+    set({ autoSpin });
+  },
+
+  setFlatMode(flatMode) {
+    set({ flatMode });
+  },
+
+  setScene(scene) {
+    get().seal();
+    get().update((doc) => {
+      if (scene) return { ...doc, scene };
+      const { scene: _removed, ...rest } = doc;
+      return rest;
+    });
+    get().seal();
+  },
+
+  patchMockup(patch, coalesceKey) {
+    if (!coalesceKey) get().seal();
+    const def = get().definition;
+    get().update(
+      (doc) => (doc.mockup ? withMockup(doc, def, { ...doc.mockup, ...patch }) : doc),
+      coalesceKey,
+    );
+    if (!coalesceKey) get().seal();
+  },
+
+  patchScene(patch, coalesceKey) {
+    if (!coalesceKey) get().seal();
+    get().update(
+      (doc) => (doc.scene ? { ...doc, scene: { ...doc.scene, ...patch } } : doc),
+      coalesceKey,
+    );
+    if (!coalesceKey) get().seal();
+  },
+
   setShowPodium(showPodium) {
     set({ showPodium });
   },

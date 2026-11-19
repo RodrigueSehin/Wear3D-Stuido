@@ -28,8 +28,12 @@ import { getCachedImage } from "@/lib/studio/assets";
 import { useAtlas } from "@/lib/studio/atlas";
 import { NUMBER_STYLES, STUDIO_FONTS } from "@/lib/studio/fonts";
 import { PATTERNS, patternPreview, PATTERN_PREFIX } from "@/lib/studio/patterns";
+import { unitScale, useSettings } from "@/lib/studio/settings";
 import { patternZones, useSelectedLayer, useStudio } from "@/lib/studio/store";
 import { ColorField, NumberBox, PanelCard, PanelTitle, Section, SelectBox } from "./controls";
+import { MockupInspector } from "./mockups-panel";
+import { SceneInspector } from "./scenes-panel";
+import { SettingsInspector } from "./settings-panel";
 
 const BLEND_LABELS: Record<BlendMode, string> = {
   normal: "Normal",
@@ -47,6 +51,15 @@ export function Inspector() {
   const setOpen = useStudio((s) => s.setInspectorOpen);
   const selection = useStudio((s) => s.selection);
   const layer = useSelectedLayer();
+  // Rail « Paramètres » ouvert : l'inspecteur présente les paramètres avancés.
+  const settingsMode = useStudio((s) => s.rail === "settings" && s.libraryOpen);
+  // Rail « Scènes » ouvert, ou ligne « Scène » sélectionnée : réglages de la scène.
+  const sceneRail = useStudio((s) => s.rail === "scenes" && s.libraryOpen);
+  const mockupRail = useStudio((s) => s.rail === "mockups" && s.libraryOpen);
+  // Le rail ouvert prime sur une sélection précédente (scène ↔ maquette).
+  const sceneMode = sceneRail || (!mockupRail && selection?.kind === "scene");
+  // Rail « Maquettes » ouvert, ou ligne « Maquette » sélectionnée.
+  const mockupMode = !sceneMode && (mockupRail || selection?.kind === "mockup");
   return (
     <PanelCard className="w-[300px] shrink-0">
       <PanelTitle
@@ -64,10 +77,19 @@ export function Inspector() {
         Inspecteur
       </PanelTitle>
       <div className="min-h-0 flex-1 overflow-y-auto pb-4">
-        {layer && <LayerInspector key={layer.id} layer={layer} />}
-        {selection?.kind === "base" && <BaseInspector />}
-        {selection?.kind === "pattern" && <PatternInspector />}
-        {!selection && (
+        {settingsMode && <SettingsInspector />}
+        {!settingsMode && sceneMode && <SceneInspector />}
+        {!settingsMode && mockupMode && <MockupInspector />}
+        {!settingsMode && !sceneMode && !mockupMode && layer && (
+          <LayerInspector key={layer.id} layer={layer} />
+        )}
+        {!settingsMode && !sceneMode && !mockupMode && selection?.kind === "base" && (
+          <BaseInspector />
+        )}
+        {!settingsMode && !sceneMode && !mockupMode && selection?.kind === "pattern" && (
+          <PatternInspector />
+        )}
+        {!settingsMode && !sceneMode && !mockupMode && !selection && (
           <p className="text-muted-foreground px-5 text-sm">
             Sélectionnez un calque, un élément sur le vêtement ou la couleur de base.
           </p>
@@ -99,6 +121,12 @@ function LayerInspector({ layer }: { layer: Layer }) {
     return img ? img.width / img.height : undefined;
   };
   const size = layerSizePx(layer, zonePx, aspect);
+  // Unité d'affichage (Paramètres → Unités) : px de l'atlas d'export, ou mm / cm imprimés.
+  const unit = useSettings((st) => st.unit);
+  const us = unitScale(unit, zonePx, zone?.printAreaMm);
+  const kx = us.x / zonePx.w;
+  const ky = us.y / zonePx.h;
+  const fmt = (v: number) => Number(v.toFixed(us.decimals));
   const [linked, setLinked] = useState(true);
   const t = layer.transform;
   const commitColor = (c: string) => {
@@ -189,7 +217,8 @@ function LayerInspector({ layer }: { layer: Layer }) {
 
       {layer.type === "text" && (
         <Section title="Texte">
-          <input
+          <textarea
+            rows={2}
             value={layer.text.value}
             maxLength={200}
             onChange={(e) =>
@@ -201,7 +230,7 @@ function LayerInspector({ layer }: { layer: Layer }) {
             }
             onBlur={seal}
             aria-label="Contenu du texte"
-            className="border-border focus:border-action h-10 rounded-lg border bg-white px-3 text-sm outline-none"
+            className="border-border focus:border-action resize-none rounded-lg border bg-white px-3 py-2 text-sm outline-none"
           />
           <SelectBox
             ariaLabel="Police"
@@ -244,6 +273,74 @@ function LayerInspector({ layer }: { layer: Layer }) {
                 "spacing",
               )
             }
+          />
+          <LabeledSlider
+            label="Interligne"
+            value={layer.text.lineHeight}
+            min={0.6}
+            max={3}
+            step={0.05}
+            format={(v) => v.toFixed(2)}
+            onChange={(v) =>
+              set(
+                (l) => (l.type === "text" ? { ...l, text: { ...l.text, lineHeight: v } } : l),
+                "lineHeight",
+              )
+            }
+          />
+          <LabeledSlider
+            label="Courbure"
+            value={layer.text.arc}
+            min={-180}
+            max={180}
+            step={5}
+            format={(v) => `${Math.round(v)}°`}
+            onChange={(v) =>
+              set((l) => (l.type === "text" ? { ...l, text: { ...l.text, arc: v } } : l), "arc")
+            }
+          />
+          {(
+            [
+              ["italic", "Italique"],
+              ["underline", "Souligné"],
+              ["relief", "Relief"],
+              ["rounded", "Angles arrondis"],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key} className="flex items-center gap-3 text-[15px] text-[#0b1530]">
+              <span className="flex-1">{label}</span>
+              <Switch
+                checked={layer.text[key]}
+                onCheckedChange={(v) => {
+                  seal();
+                  set(
+                    (l) => (l.type === "text" ? { ...l, text: { ...l.text, [key]: v } } : l),
+                    key,
+                  );
+                  seal();
+                }}
+              />
+            </label>
+          ))}
+          <SelectBox
+            ariaLabel="Alignement"
+            value={layer.text.align}
+            onChange={(v) => {
+              seal();
+              set(
+                (l) =>
+                  l.type === "text"
+                    ? { ...l, text: { ...l.text, align: v as "left" | "center" | "right" } }
+                    : l,
+                "align",
+              );
+              seal();
+            }}
+            options={[
+              { value: "left", label: "Aligné à gauche" },
+              { value: "center", label: "Centré" },
+              { value: "right", label: "Aligné à droite" },
+            ]}
           />
         </Section>
       )}
@@ -290,23 +387,31 @@ function LayerInspector({ layer }: { layer: Layer }) {
         <div className="grid grid-cols-2 gap-3">
           <NumberBox
             label="X"
-            unit="px"
-            value={Math.round(t.x * zonePx.w)}
+            unit={unit}
+            value={fmt(t.x * us.x)}
+            step={us.decimals ? 0.1 : 1}
             onChange={(v) =>
-              set((l) => ({ ...l, transform: { ...l.transform, x: v / zonePx.w } }), "x")
+              set((l) => ({ ...l, transform: { ...l.transform, x: v / us.x } }), "x")
             }
           />
           <NumberBox
             label="Y"
-            unit="px"
-            value={Math.round(t.y * zonePx.h)}
+            unit={unit}
+            value={fmt(t.y * us.y)}
+            step={us.decimals ? 0.1 : 1}
             onChange={(v) =>
-              set((l) => ({ ...l, transform: { ...l.transform, y: v / zonePx.h } }), "y")
+              set((l) => ({ ...l, transform: { ...l.transform, y: v / us.y } }), "y")
             }
           />
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <NumberBox label="W" unit="px" value={Math.round(size.w)} min={1} onChange={setW} />
+          <NumberBox
+            label="W"
+            unit={unit}
+            value={fmt(size.w * kx)}
+            min={0.1}
+            onChange={(v) => setW(v / kx)}
+          />
           <button
             type="button"
             onClick={() => setLinked(!linked)}
@@ -320,7 +425,13 @@ function LayerInspector({ layer }: { layer: Layer }) {
               <Unlink2 className="size-5" aria-hidden />
             )}
           </button>
-          <NumberBox label="H" unit="px" value={Math.round(size.h)} min={1} onChange={setH} />
+          <NumberBox
+            label="H"
+            unit={unit}
+            value={fmt(size.h * ky)}
+            min={0.1}
+            onChange={(v) => setH(v / ky)}
+          />
         </div>
         <div className="flex items-center gap-2">
           <span className="w-16 text-sm text-[#0b1530]">Rotation</span>
@@ -439,7 +550,38 @@ function LayerInspector({ layer }: { layer: Layer }) {
         ))}
       </Section>
 
-      <Section title="Couleur" defaultOpen={false}>
+      <Section title="Couleur" defaultOpen={layer.type === "image" && !!layer.tint}>
+        {layer.type === "image" && (
+          <>
+            <label className="flex items-center gap-3 text-[15px] text-[#0b1530]">
+              <span className="flex-1">Recolorer l&apos;image</span>
+              <Switch
+                checked={!!layer.tint}
+                onCheckedChange={(on) => {
+                  seal();
+                  set((l) => {
+                    if (l.type !== "image") return l;
+                    if (!on) {
+                      const { tint: _t, ...rest } = l;
+                      return rest;
+                    }
+                    return { ...l, tint: "#FFFFFF" };
+                  }, "tint-toggle");
+                  seal();
+                }}
+              />
+            </label>
+            {layer.tint && (
+              <ColorField
+                label="Couleur"
+                value={layer.tint}
+                recent={recent}
+                onChange={(c) => set((l) => (l.type === "image" ? { ...l, tint: c } : l), "tint")}
+                onCommit={commitColor}
+              />
+            )}
+          </>
+        )}
         {(layer.type === "text" || layer.type === "number") && (
           <ColorField
             label="Remplissage"

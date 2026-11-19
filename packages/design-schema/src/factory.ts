@@ -69,6 +69,12 @@ export function createTextLayer(zone: string, value = "TEXTE"): TextLayer {
       weight: 700,
       letterSpacing: 0,
       arc: 0,
+      italic: false,
+      underline: false,
+      align: "center",
+      lineHeight: 1,
+      relief: false,
+      rounded: false,
     },
   };
 }

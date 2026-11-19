@@ -2,14 +2,18 @@ import { Badge, Button, Logo } from "@wear3d/ui";
 import {
   ArrowRight,
   Box,
+  Building2,
   Download,
   Layers,
   PlayCircle,
   Shirt,
   Sparkles,
+  Star,
   Users,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
+import { HeroShowcase } from "@/components/marketing/hero-showcase";
 import { getTranslations } from "next-intl/server";
 
 const FAMILIES = [
@@ -23,6 +27,13 @@ const FAMILIES = [
   "shorts",
   "jackets",
 ] as const;
+
+const STATS = [
+  { icon: Users, value: "10 000+", label: "Créateurs" },
+  { icon: Building2, value: "1 200+", label: "Entreprises & clubs" },
+  { icon: Shirt, value: "50+", label: "Modèles de vêtements" },
+  { icon: Star, value: "4,8/5", label: "Satisfaction client" },
+];
 
 const FEATURES = [
   { icon: Box, title: "Éditeur 3D intuitif", text: "Visualisation en temps réel" },
@@ -38,29 +49,68 @@ export default async function HomePage() {
 
   return (
     <>
-      <section className="bg-hero text-white">
-        <div className="mx-auto max-w-7xl px-4 pb-20 pt-10 sm:px-6">
-          <Badge variant="outline" className="bg-brand-navy-800/60 border-white/25 text-white">
-            {t("badge")}
-          </Badge>
-          <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.05] sm:text-6xl">
-            {t("titleStart")} <span className="text-brand-sky">{t("titleHighlight")}</span>
-          </h1>
-          <p className="mt-5 max-w-2xl text-lg text-white/80">{t("subtitle")}</p>
-          <div className="mt-8 flex flex-wrap gap-4">
-            <Button asChild size="lg">
-              <Link href="/catalogue">
-                Essayer gratuitement <ArrowRight aria-hidden />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline-dark">
-              <Link href="/produit">
-                <PlayCircle aria-hidden /> {t("demo")}
-              </Link>
-            </Button>
+      <section className="bg-brand-navy-950 text-white">
+        <div className="relative overflow-hidden">
+          <Image
+            src="/hero/background.png"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-[75%_bottom]"
+          />
+          <div
+            aria-hidden
+            className="from-brand-navy-950 via-brand-navy-950/60 absolute inset-0 bg-gradient-to-r to-transparent"
+          />
+          <div className="relative mx-auto max-w-7xl px-4 pb-4 pt-6 sm:px-6">
+            <div className="grid items-center gap-8 lg:grid-cols-[1.05fr_1fr]">
+              <div>
+                <Badge
+                  variant="outline"
+                  className="bg-brand-navy-800/60 border-white/25 text-white"
+                >
+                  {t("badge")}
+                </Badge>
+                <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.05] sm:text-6xl">
+                  {t("titleStart")} <span className="text-brand-sky">{t("titleHighlight")}</span>
+                </h1>
+                <p className="mt-5 max-w-xl text-lg text-white/80">{t("subtitle")}</p>
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <Button asChild size="lg">
+                    <Link href="/catalogue">
+                      Essayer gratuitement <ArrowRight aria-hidden />
+                    </Link>
+                  </Button>
+                  <Button asChild size="lg" variant="outline-dark">
+                    <Link href="/produit">
+                      <PlayCircle aria-hidden /> {t("demo")}
+                    </Link>
+                  </Button>
+                </div>
+                <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+                  {STATS.map(({ icon: Icon, value, label }) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <Icon
+                        className="size-6 shrink-0 text-white/80"
+                        strokeWidth={1.5}
+                        aria-hidden
+                      />
+                      <div>
+                        <dt className="text-sm font-bold leading-tight">{value}</dt>
+                        <dd className="text-[11px] leading-tight text-white/70">{label}</dd>
+                      </div>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+              <HeroShowcase />
+            </div>
           </div>
+        </div>
 
-          <ul className="bg-brand-navy-900/70 mt-14 grid gap-4 rounded-lg border border-white/10 p-5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6">
+          <ul className="bg-brand-navy-900/70 grid gap-4 rounded-lg border border-white/10 p-5 sm:grid-cols-2 lg:grid-cols-5">
             {FEATURES.map(({ icon: Icon, title, text }) => (
               <li key={title} className="flex items-center gap-3">
                 <Icon className="size-8 shrink-0 text-white" strokeWidth={1.5} aria-hidden />

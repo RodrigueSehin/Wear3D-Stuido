@@ -1,6 +1,6 @@
 "use client";
 
-import { cn, Popover, PopoverContent, PopoverTrigger } from "@wear3d/ui";
+import { cn, Popover, PopoverContent, PopoverTrigger, Slider } from "@wear3d/ui";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -253,5 +253,50 @@ export function ColorField({
         <ColorPickerPanel value={value} recent={recent} onChange={onChange} onCommit={onCommit} />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** Curseur + champ numérique en %, valeur stockée en fraction (0,2 = 20 %). */
+export function PercentSlider({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  /** `commit` = saisie au clavier (étape d'historique immédiate). */
+  onChange: (v: number, commit: boolean) => void;
+  /** Fin d'un glisser du curseur. */
+  onCommit?: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-sm text-[#0b1530]">{label}</span>
+      <div className="flex items-center gap-3">
+        <Slider
+          value={[value]}
+          min={min}
+          max={max}
+          step={0.01}
+          aria-label={label}
+          onValueChange={([v]) => onChange(v ?? value, false)}
+          onValueCommit={onCommit}
+          className="flex-1"
+        />
+        <NumberBox
+          unit="%"
+          value={Math.round(value * 100)}
+          min={Math.round(min * 100)}
+          max={Math.round(max * 100)}
+          onChange={(v) => onChange(v / 100, true)}
+          className="w-[84px] shrink-0"
+        />
+      </div>
+    </div>
   );
 }

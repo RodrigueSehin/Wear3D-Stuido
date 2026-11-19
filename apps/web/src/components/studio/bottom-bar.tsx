@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from "@wear3d/ui";
 import { ChevronDown } from "lucide-react";
+import { draggable } from "@/lib/studio/placement";
 import { useStudio, useSelectedLayer } from "@/lib/studio/store";
 import { fabricSwatch } from "@/lib/studio/swatches";
 import { setView } from "@/lib/studio/viewer-bridge";
@@ -151,6 +152,8 @@ export function BottomBar() {
               aria-label={`Appliquer ${c}`}
               aria-pressed={current === c}
               onClick={() => applyColor(c)}
+              {...draggable({ kind: "color", color: c })}
+              title="Cliquer pour appliquer, ou glisser sur une zone du vêtement"
               className={cn(
                 "size-8 rounded-full border border-black/10 shadow-sm transition hover:scale-110",
                 current === c && "ring-action ring-2 ring-offset-2",

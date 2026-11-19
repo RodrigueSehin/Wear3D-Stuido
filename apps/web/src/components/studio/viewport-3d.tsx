@@ -16,6 +16,10 @@ import { ChevronLeft, ChevronRight, MonitorX, Rotate3d } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { composeInto, getAtlasCanvas, useAtlas } from "@/lib/studio/atlas";
 import { endDrag, surfaceDown, surfaceMove } from "@/lib/studio/interaction";
+import { applyDrop, isPanelDrag } from "@/lib/studio/placement";
+import { useSceneBackdrop } from "@/lib/studio/scene-backdrop";
+import { AMBIANCE_LIGHT, sceneById, sceneFilter } from "@/lib/studio/scenes";
+import { useSettings } from "@/lib/studio/settings";
 import { useStudio } from "@/lib/studio/store";
 import { viewerBridge } from "@/lib/studio/viewer-bridge";
 
@@ -42,7 +46,13 @@ function nearestView(azimuth: number): ViewPreset {
 export default function Viewport3D() {
   const definition = useStudio((s) => s.definition);
   const doc = useStudio((s) => s.doc);
-  const lighting = useStudio((s) => s.lighting);
+  const defaultLighting = useStudio((s) => s.lighting);
+  // Scène de présentation : décor, environnement d'éclairage et ambiance.
+  const scene = useStudio((s) => s.doc?.scene);
+  const sceneDef = scene ? sceneById(scene.id) : undefined;
+  const backdrop = useSceneBackdrop(scene?.id);
+  const lighting = scene ? (sceneDef?.environment ?? "studio") : defaultLighting;
+  const ambiance = scene ? AMBIANCE_LIGHT[scene.ambiance] : undefined;
   const hoveredZone = useStudio((s) => s.hoveredZone);
   const selectedZone = useStudio((s) => s.selectedZone);
   const selection = useStudio((s) => s.selection);
@@ -74,7 +84,7 @@ export default function Viewport3D() {
       viewerBridge.viewer = handle;
       viewerBridge.renderHd =
         handle && texture
-          ? async () => {
+          ? async (width: number) => {
               const s = useStudio.getState();
               if (!s.doc || !s.definition) throw new Error("Aucun design");
               const hd = document.createElement("canvas");
@@ -83,7 +93,7 @@ export default function Viewport3D() {
               texture.image = hd;
               texture.needsUpdate = true;
               try {
-                return await handle.capture(3840);
+                return await handle.capture(width);
               } finally {
                 texture.image = getAtlasCanvas();
                 texture.needsUpdate = true;
@@ -132,6 +142,17 @@ export default function Viewport3D() {
     useStudio.getState().setActiveView(bar);
   }, [azimuth]);
 
+  const settings = useSettings();
+  const autoSpin = useStudio((s) => s.autoSpin);
+  const layerCount = doc?.layers.length ?? 0;
+
+  // Textures haute définition : filtrage anisotrope maximal de l'atlas.
+  useEffect(() => {
+    if (!texture) return;
+    texture.anisotropy = settings.hdTextures ? 16 : 2;
+    texture.needsUpdate = true;
+  }, [texture, settings.hdTextures]);
+
   const materials = useMemo(
     () => Object.fromEntries(Object.entries(doc?.zones ?? {}).map(([z, v]) => [z, v.material])),
     [doc?.zones],
@@ -155,40 +176,108 @@ export default function Viewport3D() {
   const highlight = editing && selection?.kind === "base" ? selectedZone : null;
 
   return (
-    <div className="relative min-h-0 flex-1">
-      {definition && texture && webgl && (
-        <GarmentViewer
-          ref={setViewerRef}
-          className={cn(
-            "!absolute inset-0",
-            hoveredZone && editing && "cursor-pointer",
-            dragging && "cursor-grabbing",
-          )}
-          definition={definition}
-          atlas={texture}
-          atlasVersion={atlasVersion}
-          materials={materials}
-          lighting={lighting}
-          hoveredZone={editing ? hoveredZone : null}
-          selectedZone={highlight}
-          tool={preview ? "orbit" : tool}
-          showPodium={showPodium}
-          autoRotate={preview}
-          interacting={dragging}
-          onSurfaceDown={surfaceDown}
-          onSurfaceMove={surfaceMove}
-          onHoverZone={(z) => useStudio.getState().setHoveredZone(z)}
-          onAzimuthChange={onAzimuth}
-          onMissed={() => editing && useStudio.getState().select(null)}
-          onReady={() => setReady(true)}
-        />
-      )}
+    <div
+      className="relative min-h-0 flex-1"
+      onPointerDownCapture={() => autoSpin && useStudio.getState().setAutoSpin(false)}
+      // Glisser-déposer depuis les panneaux : dépôt au point visé sur le vêtement.
+      onDragOver={(e) => {
+        if (!isPanelDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        const hit = viewer.current?.pick(e.clientX, e.clientY)[0];
+        const zone = hit?.zone ?? null;
+        if (zone !== useStudio.getState().hoveredZone) useStudio.getState().setHoveredZone(zone);
+      }}
+      onDragLeave={() => useStudio.getState().setHoveredZone(null)}
+      onDrop={(e) => {
+        if (!isPanelDrag(e)) return;
+        e.preventDefault();
+        const hit = viewer.current?.pick(e.clientX, e.clientY)[0] ?? null;
+        useStudio.getState().setHoveredZone(null);
+        applyDrop(hit);
+      }}
+    >
+      <div
+        className="absolute inset-0 overflow-hidden rounded-2xl"
+        style={{ filter: sceneFilter(scene) }}
+      >
+        {backdrop && (
+          <div
+            aria-hidden
+            className="absolute -inset-4 bg-cover bg-center transition-[filter] duration-300"
+            style={{
+              backgroundImage: `url("${backdrop}")`,
+              filter: scene?.backgroundBlur ? "blur(8px)" : undefined,
+            }}
+          />
+        )}
+        {definition && texture && webgl && (
+          <GarmentViewer
+            ref={setViewerRef}
+            className={cn(
+              "!absolute inset-0",
+              hoveredZone && editing && "cursor-pointer",
+              dragging && "cursor-grabbing",
+            )}
+            definition={definition}
+            atlas={texture}
+            atlasVersion={atlasVersion}
+            materials={materials}
+            lighting={lighting}
+            hoveredZone={editing ? hoveredZone : null}
+            selectedZone={highlight}
+            tool={preview ? "orbit" : tool}
+            showPodium={showPodium}
+            autoRotate={preview || autoSpin}
+            dpr={settings.resolution === "high" ? [1, 2] : 1}
+            antialias={settings.antialias}
+            shadows={settings.shadows}
+            showGrid={settings.showGrid}
+            showAxes={settings.showAxes}
+            modelScale={settings.modelScale / 100}
+            fabricSheen={settings.fabricSheen}
+            fabricRelief={settings.fabricRelief}
+            guideColor={settings.accent}
+            interacting={dragging}
+            onSurfaceDown={surfaceDown}
+            onSurfaceMove={surfaceMove}
+            onHoverZone={(z) => useStudio.getState().setHoveredZone(z)}
+            onAzimuthChange={onAzimuth}
+            onMissed={() => editing && useStudio.getState().select(null)}
+            onReady={() => setReady(true)}
+            lightIntensity={scene?.intensity ?? 1}
+            lightAngle={scene?.angle ?? 330}
+            lightColor={ambiance?.color}
+            exposure={ambiance?.exposure ?? 1}
+            groundShadow={scene?.groundShadow ?? true}
+            podiumReflect={scene?.reflection ?? false}
+          />
+        )}
+      </div>
 
       {!ready && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4">
           <div className="h-72 w-56 animate-pulse rounded-[42%_42%_14%_14%] bg-[#0a1638]/10" />
           <p className="text-muted-foreground text-sm">Chargement du modèle…</p>
         </div>
+      )}
+
+      {/* Informations sur l'objet (Paramètres → Affichage 3D). */}
+      {settings.showInfo && definition && !preview && (
+        <dl className="absolute bottom-4 left-4 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 rounded-xl bg-white/80 px-3 py-2 text-xs text-[#0b1530] shadow-sm backdrop-blur">
+          <dt className="text-muted-foreground">Modèle</dt>
+          <dd className="font-medium">{definition.name}</dd>
+          <dt className="text-muted-foreground">Taille</dt>
+          <dd className="font-medium">{doc?.model.size ?? "—"}</dd>
+          <dt className="text-muted-foreground">Zones</dt>
+          <dd className="font-medium">{definition.zones.length}</dd>
+          <dt className="text-muted-foreground">Calques</dt>
+          <dd className="font-medium">{layerCount}</dd>
+          <dt className="text-muted-foreground">Rotation</dt>
+          <dd className="font-medium">{azimuth}°</dd>
+          <dt className="text-muted-foreground">Échelle</dt>
+          <dd className="font-medium">{settings.modelScale} %</dd>
+        </dl>
       )}
 
       {/* Miniatures des vues (colonne droite). */}

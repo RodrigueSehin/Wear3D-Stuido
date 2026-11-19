@@ -33,7 +33,11 @@ export function Stage() {
         <div
           role="tablist"
           aria-label="Mode de vue"
-          className="absolute right-3 top-4 flex rounded-full border border-white/80 bg-white/90 p-1 shadow-[0_8px_24px_rgba(15,35,90,0.10)]"
+          className={cn(
+            "absolute right-3 flex rounded-full",
+            "border border-white/80 bg-white/90 p-1 shadow-[0_8px_24px_rgba(15,35,90,0.10)]",
+            viewMode === "2d" ? "top-9" : "top-4",
+          )}
         >
           {(
             [

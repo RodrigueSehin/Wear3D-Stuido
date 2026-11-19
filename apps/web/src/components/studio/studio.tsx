@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { STUDIO_FONTS } from "@/lib/studio/fonts";
 import { loadDesign, saveDesign } from "@/lib/studio/persistence";
+import { accentVars, useSettings } from "@/lib/studio/settings";
 import { selectedLayerId, useStudio } from "@/lib/studio/store";
 import { AtlasComposer } from "./atlas-composer";
 import { BottomBar } from "./bottom-bar";
@@ -15,6 +16,7 @@ import { Inspector } from "./inspector";
 import { LayersPanel } from "./layers-panel";
 import { LeftPanel } from "./left-panel";
 import { LeftRail } from "./left-rail";
+import { applyDefaultView } from "./settings-panel";
 import { Stage } from "./stage";
 import { TopBar } from "./top-bar";
 
@@ -36,6 +38,24 @@ export function Studio({
   const inspectorOpen = useStudio((s) => s.inspectorOpen);
   const preview = useStudio((s) => s.preview);
   const ready = loadedId === designId && hasDoc;
+  const theme = useSettings((st) => st.theme);
+  const accent = useSettings((st) => st.accent);
+  const [systemDark, setSystemDark] = useState(false);
+
+  // Thème « Auto » : suit le réglage clair / sombre du système.
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setSystemDark(mq.matches);
+    const on = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  const resolvedTheme = theme === "auto" ? (systemDark ? "dark" : "light") : theme;
+
+  // Vue par défaut (3D, 2D ou 360°) appliquée à l'ouverture de chaque design.
+  useEffect(() => {
+    if (ready) applyDefaultView(useSettings.getState().defaultView);
+  }, [ready, designId]);
 
   // Chargement ou création du brouillon local.
   useEffect(() => {
@@ -176,7 +196,11 @@ export function Studio({
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#0a1638]">
+    <div
+      className="flex h-full flex-col bg-[#0a1638]"
+      data-studio-theme={resolvedTheme}
+      style={accentVars(accent) as React.CSSProperties}
+    >
       {/* Force le chargement des polices du studio pour la composition Canvas. */}
       <div aria-hidden className="pointer-events-none fixed -left-[9999px] opacity-0">
         {Object.values(STUDIO_FONTS).map((f) => (
@@ -194,7 +218,7 @@ export function Studio({
             {!preview && <LeftRail />}
             <main
               className={cn(
-                "flex min-w-0 flex-1 gap-3 p-3",
+                "studio-stage flex min-w-0 flex-1 gap-3 p-3",
                 "bg-[radial-gradient(ellipse_at_45%_40%,#ffffff_0%,#eef3fb_45%,#dfe7f5_100%)]",
                 !preview && "rounded-tl-2xl",
               )}

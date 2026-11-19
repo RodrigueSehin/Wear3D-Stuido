@@ -38,6 +38,11 @@ import { getCachedImage } from "@/lib/studio/assets";
 import { useAtlas } from "@/lib/studio/atlas";
 import { resolveNumberFont, STUDIO_FONTS, type StudioFontKey } from "@/lib/studio/fonts";
 import { patternPreview } from "@/lib/studio/patterns";
+import { useSceneBackdrop } from "@/lib/studio/scene-backdrop";
+import { effectiveColors, MOCKUPS } from "@/lib/studio/mockups";
+import { sceneById } from "@/lib/studio/scenes";
+import { placementZone, revealZone } from "@/lib/studio/placement";
+import { contrastColor } from "@/lib/studio/textures";
 import { patternZones, useStudio } from "@/lib/studio/store";
 import { PanelCard, PanelTitle } from "./controls";
 
@@ -134,6 +139,11 @@ export function LayersPanel() {
   const layers = doc?.layers ?? [];
   const ordered = [...layers].reverse(); // le plus haut en premier
   const patterned = patternZones(doc);
+  const scene = doc?.scene;
+  const viewMode = useStudio((st) => st.viewMode);
+  const mockup = doc?.mockup;
+  const mockupColors = mockup ? effectiveColors(mockup) : null;
+  const sceneThumb = useSceneBackdrop(scene?.id);
   const firstPattern = patterned[0] ? doc?.zones[patterned[0]]?.pattern : undefined;
   const baseColor = doc?.zones[definition?.zones[0]?.code ?? ""]?.color ?? "#1D4ED8";
   const patternImg = useMemo(
@@ -149,10 +159,11 @@ export function LayersPanel() {
     seal();
   };
 
-  const targetZone = (cap: "text" | "image") => {
-    const s = useStudio.getState();
-    const z = s.definition?.zones.find((d) => d.code === s.selectedZone);
-    return z?.allows.includes(cap) ? z.code : "BODY_FRONT";
+  /** Ajoute un calque sur le côté visible du vêtement, puis le montre. */
+  const addVisible = (make: (zone: string) => Parameters<typeof addLayer>[0]) => {
+    const layer = make(placementZone("text"));
+    addLayer(layer);
+    revealZone(layer.zone);
   };
 
   return (
@@ -172,12 +183,22 @@ export function LayersPanel() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onSelect={() =>
-                  addLayer({ ...createTextLayer(targetZone("text"), "WEAR3D"), name: undefined })
+                  addVisible((zone) => ({ ...createTextLayer(zone, "WEAR3D"), name: undefined }))
                 }
               >
                 <Type /> Texte
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => addLayer(createNumberLayer("BODY_BACK", "10"))}>
+              <DropdownMenuItem
+                onSelect={() =>
+                  addVisible((zone) => {
+                    const body = zone.startsWith("BODY") ? zone : "BODY_FRONT";
+                    const layer = createNumberLayer(body, "10");
+                    const fabric = useStudio.getState().doc?.zones[body]?.color ?? "#FFFFFF";
+                    layer.number.color = contrastColor(fabric);
+                    return layer;
+                  })
+                }
+              >
                 <Hash /> Numéro
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openRail("logos")}>
@@ -195,13 +216,41 @@ export function LayersPanel() {
           </DropdownMenu>
         }
       >
-        Calques
+        {viewMode === "2d" ? "Calques (2D)" : "Calques"}
       </PanelTitle>
 
       <ul
         className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-3 pb-4"
         onDragLeave={() => setOverIndex(null)}
       >
+        {scene && (
+          <li
+            className={cn(
+              row,
+              selection?.kind === "scene" ? "bg-[#e3ecff]" : "hover:bg-surface-muted",
+            )}
+          >
+            <GripVertical className="size-4 shrink-0 text-[#0b1530]/20" aria-hidden />
+            <Eye className="size-5 text-[#0b1530]/40" aria-hidden />
+            <button
+              type="button"
+              onClick={() => select({ kind: "scene" })}
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+            >
+              <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#0a1638]">
+                {sceneThumb && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={sceneThumb} alt="" className="size-full object-cover" />
+                )}
+              </span>
+              <span className="truncate text-[15px] text-[#0b1530]">
+                Scène : {sceneById(scene.id)?.label ?? "importée"}
+              </span>
+            </button>
+            <Lock className="mr-1.5 size-4 text-[#0b1530]/40" aria-label="Décor de présentation" />
+          </li>
+        )}
+
         {ordered.map((layer, i) => {
           const selected = selection?.kind === "layer" && selection.id === layer.id;
           const docIndex = layers.length - 1 - i;
@@ -267,6 +316,34 @@ export function LayersPanel() {
             </li>
           );
         })}
+
+        {mockup && (
+          <li
+            className={cn(
+              row,
+              selection?.kind === "mockup" ? "bg-[#e3ecff]" : "hover:bg-surface-muted",
+            )}
+          >
+            <GripVertical className="size-4 shrink-0 text-[#0b1530]/20" aria-hidden />
+            <Eye className="size-5 text-[#0b1530]/40" aria-hidden />
+            <button
+              type="button"
+              onClick={() => select({ kind: "mockup" })}
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+            >
+              <span
+                className="size-10 shrink-0 rounded-lg border border-black/5"
+                style={{
+                  background: `linear-gradient(135deg, ${mockupColors![0]} 55%, ${mockupColors![1]} 55%, ${mockupColors![1]} 72%, ${mockupColors![2]} 72%)`,
+                }}
+              />
+              <span className="truncate text-[15px] text-[#0b1530]">
+                Maquette ({MOCKUPS.find((m) => m.id === mockup.id)?.label ?? "importée"})
+              </span>
+            </button>
+            <Lock className="mr-1.5 size-4 text-[#0b1530]/40" aria-label="Maquette de base" />
+          </li>
+        )}
 
         {patterned.length > 0 && (
           <li
