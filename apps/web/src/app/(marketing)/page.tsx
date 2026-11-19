@@ -4,28 +4,32 @@ import {
   Box,
   Building2,
   Download,
+  Eye,
   Layers,
   PlayCircle,
   Shirt,
+  SlidersHorizontal,
   Sparkles,
   Star,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { HeroShowcase } from "@/components/marketing/hero-showcase";
 import { getTranslations } from "next-intl/server";
+import { HeroShowcase } from "@/components/marketing/hero-showcase";
 
+/** Familles du catalogue : visuel (public/vetements) et lien vers la famille. */
 const FAMILIES = [
-  "tshirts",
-  "football",
-  "polos",
-  "hoodies",
-  "sport",
-  "basketball",
-  "uniforms",
-  "shorts",
-  "jackets",
+  { id: "tshirts", img: "tshirt" },
+  { id: "football", img: "football" },
+  { id: "polos", img: "polo" },
+  { id: "hoodies", img: "hoodie" },
+  { id: "sport", img: "veste" },
+  { id: "basketball", img: "basketball" },
+  { id: "uniforms", img: "uniforme" },
+  { id: "shorts", img: "short" },
+  { id: "jackets", img: "veste" },
 ] as const;
 
 const STATS = [
@@ -43,13 +47,20 @@ const FEATURES = [
   { icon: Users, title: "Collaboratif", text: "Idéal pour équipes et clubs" },
 ];
 
+const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
+  { icon: Shirt, title: "Choisissez un modèle", text: "Parmi notre catalogue 3D" },
+  { icon: SlidersHorizontal, title: "Personnalisez", text: "Couleurs, matières, logos, textes…" },
+  { icon: Eye, title: "Visualisez en 3D", text: "Rotation 360° et rendu réaliste" },
+  { icon: Download, title: "Exportez", text: "Votre création en haute qualité" },
+];
+
 export default async function HomePage() {
   const t = await getTranslations("home");
   const tf = await getTranslations("families");
 
   return (
-    <>
-      <section className="bg-brand-navy-950 text-white">
+    <div className="bg-brand-navy-950 text-white">
+      <section>
         <div className="relative overflow-hidden">
           <Image
             src="/hero/background.png"
@@ -109,7 +120,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6">
+        <div className="mx-auto max-w-7xl px-4 pb-14 pt-4 sm:px-6">
           <ul className="bg-brand-navy-900/70 grid gap-4 rounded-lg border border-white/10 p-5 sm:grid-cols-2 lg:grid-cols-5">
             {FEATURES.map(({ icon: Icon, title, text }) => (
               <li key={title} className="flex items-center gap-3">
@@ -124,26 +135,61 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <h2 className="text-center text-3xl font-extrabold">{t("catalogTitle")}</h2>
-        <p className="text-muted-foreground mt-2 text-center">{t("catalogSubtitle")}</p>
-        <ul className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-9">
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6" aria-labelledby="catalog">
+        <h2 id="catalog" className="text-center text-3xl font-extrabold">
+          {t("catalogTitle")}
+        </h2>
+        <p className="mt-2 text-center text-white/70">{t("catalogSubtitle")}</p>
+        <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-9">
           {FAMILIES.map((f) => (
-            <li key={f}>
+            <li key={f.id}>
               <Link
-                href={`/catalogue?famille=${f}`}
-                className="border-border bg-surface shadow-card hover:border-action flex h-36 flex-col items-center justify-center gap-3 rounded-lg border p-3 text-center text-sm font-semibold transition"
+                href={`/catalogue?famille=${f.id}`}
+                className="bg-brand-navy-900/70 hover:border-brand-sky hover:bg-brand-navy-800 flex h-44 flex-col items-center justify-between gap-2 rounded-lg border border-white/10 p-3 text-center text-sm font-semibold transition"
               >
-                <Shirt className="text-action size-12" strokeWidth={1.25} aria-hidden />
-                {tf(f)}
+                <span className="relative block h-28 w-full">
+                  <Image
+                    src={`/vetements/${f.img}-hd.webp`}
+                    alt=""
+                    fill
+                    sizes="(min-width: 1024px) 11vw, 33vw"
+                    className="object-contain"
+                  />
+                </span>
+                {tf(f.id)}
               </Link>
             </li>
           ))}
         </ul>
       </section>
 
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6" aria-labelledby="steps">
+        <h2 id="steps" className="text-center text-3xl font-extrabold">
+          Créez votre vêtement en 4 étapes
+        </h2>
+        <ol className="mt-8 grid items-center gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
+          {STEPS.map(({ icon: Icon, title, text }, i) => (
+            <li key={title} className="contents">
+              <div className="bg-brand-navy-900/70 flex items-center gap-3 rounded-lg border border-white/10 p-4">
+                <span className="bg-action grid size-9 shrink-0 place-items-center rounded-full font-bold">
+                  {i + 1}
+                </span>
+                <Icon className="size-7 shrink-0" strokeWidth={1.5} aria-hidden />
+                <span>
+                  <span className="block text-sm font-semibold">{title}</span>
+                  <span className="block text-xs text-white/70">{text}</span>
+                </span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <ArrowRight className="mx-auto hidden size-5 text-white/60 md:block" aria-hidden />
+              )}
+            </li>
+          ))}
+        </ol>
+      </section>
+
       <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
-        <div className="bg-gradient-cta flex flex-col items-start gap-6 rounded-xl p-8 text-white sm:flex-row sm:items-center sm:justify-between">
+        <div className="bg-gradient-cta flex flex-col items-start gap-6 rounded-xl p-8 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-6">
             <Logo inverted className="hidden sm:inline-flex" />
             <div>
@@ -158,6 +204,6 @@ export default async function HomePage() {
           </Button>
         </div>
       </section>
-    </>
+    </div>
   );
 }
