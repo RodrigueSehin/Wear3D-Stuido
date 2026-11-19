@@ -1,8 +1,18 @@
 import type { Metadata } from "next";
-import { PagePlaceholder } from "@/components/page-placeholder";
+import { AssetLibrary } from "@/components/app/asset-library";
 
 export const metadata: Metadata = { title: "Bibliothèque" };
 
 export default function Page() {
-  return <PagePlaceholder title={"Bibliothèque"} phase="Phase 4" />;
+  return (
+    <div className="space-y-5 p-4 sm:p-6">
+      <div>
+        <h1 className="text-3xl font-extrabold">Bibliothèque</h1>
+        <p className="text-muted-foreground text-sm">
+          Vos logos et images importés, disponibles dans tous vos designs.
+        </p>
+      </div>
+      <AssetLibrary />
+    </div>
+  );
 }

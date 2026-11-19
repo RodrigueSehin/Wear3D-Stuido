@@ -11,6 +11,7 @@ import { cn } from "@wear3d/ui";
 import { ChevronsLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { MOCKUPS, newMockup, withMockup } from "@/lib/studio/mockups";
 import { STUDIO_FONTS } from "@/lib/studio/fonts";
 import {
   cloud,
@@ -42,9 +43,11 @@ const CLOUD_SAVE_DELAY_MS = 3000;
 export function Studio({
   designId,
   modelReference,
+  mockupId,
 }: {
   designId: string;
   modelReference?: string;
+  mockupId?: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +80,19 @@ export function Studio({
   // Chargement : en ligne pour un utilisateur connecté, sinon brouillon local.
   useEffect(() => {
     let cancelled = false;
-    const query = modelReference ? `?modele=${encodeURIComponent(modelReference)}` : "";
+    const params = new URLSearchParams();
+    if (modelReference) params.set("modele", modelReference);
+    if (mockupId) params.set("maquette", mockupId);
+    const query = params.size ? `?${params}` : "";
+    // Nouveau design : vierge, ou partant d'une maquette de la galerie.
+    const freshDoc = (definition: GarmentDefinition): DesignDocument => {
+      const base = createEmptyDocument(
+        definition.versionId,
+        definition.zones.map((z) => ({ code: z.code, ...z.defaults })),
+      );
+      const template = MOCKUPS.find((m) => m.id === mockupId);
+      return template ? withMockup(base, definition, newMockup(template)) : base;
+    };
     const newDefinition = () =>
       (modelReference && getGarmentByReference(modelReference)) || TSHIRT_CLASSIC;
     const initLocal = (definition: GarmentDefinition, doc: DesignDocument, name: string) => {
@@ -92,7 +107,12 @@ export function Studio({
         if (designId === "nouveau") {
           if (userId) {
             try {
-              const created = await createOnline(userId, "Mon design", newDefinition());
+              const created = await createOnline(
+                userId,
+                "Mon design",
+                newDefinition(),
+                freshDoc(newDefinition()),
+              );
               if (!cancelled) router.replace(`/studio/${created.id}${query}`);
               return;
             } catch {
@@ -148,14 +168,7 @@ export function Studio({
           return;
         }
         const definition = newDefinition();
-        initLocal(
-          definition,
-          createEmptyDocument(
-            definition.versionId,
-            definition.zones.map((z) => ({ code: z.code, ...z.defaults })),
-          ),
-          "Mon design",
-        );
+        initLocal(definition, freshDoc(definition), "Mon design");
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Chargement impossible");
       }
@@ -163,7 +176,7 @@ export function Studio({
     return () => {
       cancelled = true;
     };
-  }, [designId, modelReference, router]);
+  }, [designId, modelReference, mockupId, router]);
 
   // Sauvegarde automatique après modification.
   useEffect(() => {

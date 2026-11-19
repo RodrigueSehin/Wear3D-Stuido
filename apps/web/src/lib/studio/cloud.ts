@@ -42,6 +42,9 @@ export interface DesignSummary {
   updatedAt: string;
   thumbnailPath: string | null;
   deletedAt: string | null;
+  reviewStatus: string;
+  /** Document brut : sert à l'aperçu (couleurs) et à la famille de vêtement. */
+  document: unknown;
 }
 
 interface Row {
@@ -153,18 +156,20 @@ export async function listCloudDesigns(
 ): Promise<DesignSummary[]> {
   let q = db
     .from("designs")
-    .select("id, name, project_id, updated_at, thumbnail_path, deleted_at")
+    .select("id, name, project_id, updated_at, thumbnail_path, deleted_at, review_status, document")
     .order("updated_at", { ascending: false });
   q = opts.trash ? q.not("deleted_at", "is", null) : q.is("deleted_at", null);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  return (data as Record<string, string | null>[]).map((r) => ({
-    id: r.id!,
-    name: r.name!,
-    projectId: r.project_id!,
-    updatedAt: r.updated_at!,
-    thumbnailPath: r.thumbnail_path ?? null,
-    deletedAt: r.deleted_at ?? null,
+  return (data as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    name: String(r.name),
+    projectId: String(r.project_id),
+    updatedAt: String(r.updated_at),
+    thumbnailPath: (r.thumbnail_path as string | null) ?? null,
+    deletedAt: (r.deleted_at as string | null) ?? null,
+    reviewStatus: String(r.review_status ?? "draft"),
+    document: r.document,
   }));
 }
 

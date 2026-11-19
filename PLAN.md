@@ -222,9 +222,23 @@ Entre 1280 et 1536 px de large, Calques et Inspecteur s'empilent dans la colonne
 3. Régénérer `database.types.ts` (`pnpm db:types`) et lancer `pnpm db:test` sur la vraie base.
 4. Activer les fournisseurs Google / Microsoft / Apple si souhaité.
 
-### Phase 4 — Pages publiques et espace client
+### Phase 4 — Pages publiques et espace client ✅ code livré, validation avec un compte en attente (19 nov. 2026)
 
-Accueil, Produit, Solutions, Tarifs, Ressources, Catalogue, fiche modèle, Galerie (maquettes) ; authentification et onboarding ; tableau de bord, mes créations, bibliothèque, partages, exports, abonnement, paramètres.
+**Pages publiques** : Accueil, Produit, Solutions, Tarifs (bascule mensuelle / annuelle −20 %, comparatif, FAQ), Catalogue (filtres par famille) et fiches modèle (statiques), Galerie (maquettes par catégorie ; « Utiliser » ouvre le studio via `?maquette=`), Ressources (recherche et filtres : modèles 3D et logos téléchargeables, templates, polices).
+
+**Authentification et onboarding** : connexion, inscription, lien magique, mot de passe oublié, vérification ; `/bienvenue` propose un premier pas selon le profil d'utilisation choisi à l'inscription.
+
+**Espace client** (données réelles sous RLS, redirection vers la connexion sans session) : tableau de bord, Mes créations (aperçu, statut, filtres par famille, recherche, tri, pagination, corbeille, restauration, suppression définitive), Bibliothèque (images du compte, liens signés), Projets partagés et Exports (listes ; création des liens et exports serveur : phase 5), Abonnement (offre, consommation avec alertes à 80 % et 100 %), Paramètres (profil, langue, mot de passe, déconnexion), Générateur IA (page d'attente jusqu'à la phase 7), menu utilisateur avec nom et offre.
+
+**Écarts assumés**
+
+- Les photos des maquettes (athlètes, ordinateur) ne sont pas disponibles : les vignettes utilisent les rendus de vêtements de l'accueil. À remplacer par les visuels définitifs.
+- Textes des nouvelles pages en français dans les composants (pas dans `messages/`) : à passer en i18n avant l'ouverture de l'anglais.
+- Pas de tendances (« +20 % ») ni de fil d'activité sur le tableau de bord : pas d'historique.
+- Paiement en ligne et changement de formule : phase 8. Adresse du support : variable `NEXT_PUBLIC_CONTACT_EMAIL`.
+- Menus déroulants Solutions / Ressources de la barre de navigation : liens simples.
+
+**À vérifier** : parcours complet de l'espace client avec un vrai compte (ces pages n'ont pu être vues ici : le serveur de développement n'avait pas la configuration Supabase) ; SEO (sitemap, Open Graph).
 
 ### Phase 5 — Traitements asynchrones, exports, partage
 
